@@ -1,63 +1,68 @@
 'use client'
-import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { phoneSchema, type PhoneInput } from '@/lib/validations/auth.schema'
-import { sendOtp } from '@/lib/actions/auth.actions'
+import { checkPhoneExists } from '@/lib/actions/auth.actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2 } from 'lucide-react'
+import { useState } from 'react'
 
-export function PhoneForm({ onSuccess }: { onSuccess: (phone: string) => void }) {
-  const [isLoading, setIsLoading] = useState(false)
-  const [errorLine, setErrorLine] = useState('')
+interface PhoneFormProps {
+  onNext: (phone: string, isExistingUser: boolean) => void
+}
+
+export function PhoneForm({ onNext }: PhoneFormProps) {
+  const [loading, setLoading] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<PhoneInput>({
-    resolver: zodResolver(phoneSchema)
+    resolver: zodResolver(phoneSchema),
   })
 
   const onSubmit = async (data: PhoneInput) => {
-    setIsLoading(true)
-    setErrorLine('')
-    
-    // Auto format
-    const formattedPhone = data.phone.startsWith('242') ? `+${data.phone}` : 
-                           data.phone.startsWith('+242') ? data.phone : `+242${data.phone}`
-
-    const res = await sendOtp(formattedPhone)
-    
-    if (res.error) {
-      setErrorLine(res.error)
-      setIsLoading(false)
-    } else {
-      onSuccess(formattedPhone)
+    setLoading(true)
+    try {
+      const exists = await checkPhoneExists(data.phone)
+      onNext(data.phone, exists)
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="phone">Numéro de téléphone</Label>
-        <div className="flex">
-          <div className="flex items-center justify-center px-3 border border-r-0 border-input bg-muted rounded-l-md text-sm text-muted-foreground">
-            +242
-          </div>
-          <Input 
-            id="phone" 
-            placeholder="06xxxxxxx ou 05xxxxxxx" 
-            className="rounded-l-none"
-            {...register('phone')} 
+        <Label htmlFor="phone" className="text-slate-300">
+          Numéro de téléphone
+        </Label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm select-none">
+            🇨🇬 +242
+          </span>
+          <Input
+            id="phone"
+            type="tel"
+            placeholder="06 123 45 678"
+            className="pl-20 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 h-12"
+            {...register('phone')}
           />
         </div>
-        {errors.phone && <p className="text-sm text-red-500">{errors.phone.message}</p>}
-        {errorLine && <p className="text-sm text-red-500">{errorLine}</p>}
+        {errors.phone && (
+          <p className="text-red-400 text-sm">{errors.phone.message}</p>
+        )}
       </div>
 
-      <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 font-bold" disabled={isLoading}>
-        {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-        Recevoir le code SMS
+      <Button
+        type="submit"
+        disabled={loading}
+        className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold"
+      >
+        {loading ? 'Vérification...' : 'Continuer'}
       </Button>
+
+      <p className="text-center text-slate-500 text-xs">
+        Aucun SMS envoyé. Ton numéro est ton identifiant.
+      </p>
     </form>
   )
 }

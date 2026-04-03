@@ -4,7 +4,9 @@ import { NotificationBell } from '@/components/shared/NotificationBell'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { UserBadge } from '@/components/shared/UserBadge'
 import { TrustScoreBadge } from '@/components/shared/TrustScoreBadge'
+import { isProfileComplete } from '@/lib/utils/onboarding'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient()
@@ -14,6 +16,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (user) {
     const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
     profile = data
+  }
+
+  if (!user || (profile && !isProfileComplete(profile))) {
+    redirect('/onboarding')
   }
 
   return (

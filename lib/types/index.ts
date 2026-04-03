@@ -30,6 +30,9 @@ export interface UserProfile {
   phone: string
   full_name: string
   avatar_url: string | null
+  date_of_birth: string | null
+  quartier: string | null
+  profession: string | null
   trust_score: number
   status: UserStatus
   badge: UserBadge
@@ -39,6 +42,7 @@ export interface UserProfile {
   total_groups_failed: number
   is_banned: boolean
   banned_until: string | null
+  onboarding_done: boolean
   subscription_plan: SubscriptionPlan
   subscription_expires_at: string | null
   created_at: string
