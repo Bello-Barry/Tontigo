@@ -20,7 +20,10 @@ export async function createVault(input: CreateVaultInput): Promise<ActionResult
 
   if (error) return { error: error.message }
   revalidatePath('/epargne')
-  return { data, success: true }
+  return { 
+    data: JSON.parse(JSON.stringify(data)), 
+    success: true 
+  }
 }
 
 export async function depositToVault(

@@ -7,6 +7,8 @@ import { formatFCFA } from '@/lib/utils/format'
 import { Plus, Lock } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 export default async function EpargnePage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()

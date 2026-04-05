@@ -6,6 +6,8 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
 import { Plus, QrCode, Search } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function TontinePage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -16,7 +18,7 @@ export default async function TontinePage() {
     .from('memberships')
     .select(`
       *,
-      tontine_groups (
+      group:group_id (
         *,
         creator:creator_id (
           id,
@@ -31,17 +33,21 @@ export default async function TontinePage() {
     .order('joined_at', { ascending: false })
 
   const groups = memberships
-    ?.map(m => ({
-      ...m.tontine_groups,
-      my_membership: {
-        turn_position:    m.turn_position,
-        total_paid:       m.total_paid,
-        total_penalties:  m.total_penalties,
-        has_received_payout: m.has_received_payout,
-        status:           m.status,
-        guarantee_amount: m.guarantee_amount,
-      },
-    }))
+    ?.map(m => {
+      const g = m.group as any
+      if (!g) return null
+      return {
+        ...g,
+        my_membership: {
+          turn_position:    m.turn_position,
+          total_paid:       m.total_paid,
+          total_penalties:  m.total_penalties,
+          has_received_payout: m.has_received_payout,
+          status:           m.status,
+          guarantee_amount: m.guarantee_amount,
+        },
+      }
+    })
     .filter(Boolean) ?? []
 
   const actifs     = groups.filter(g => g.status === 'actif')

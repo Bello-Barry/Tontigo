@@ -16,7 +16,8 @@ interface Props {
   params: { id: string }
 }
 
-export default async function GroupDetailPage({ params }: Props) {
+export default async function GroupDetailPage(props: Props) {
+  const params = await props.params
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
