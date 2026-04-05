@@ -68,11 +68,11 @@ export function MemberRow({ membership, isCurrentUser, isCreator, groupId }: Mem
 
           {isCreator && !isCurrentUser && (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger render={
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-white">
                   <MoreVertical className="w-4 h-4" />
                 </Button>
-              </DropdownMenuTrigger>
+              } />
               <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-white">
                 <DropdownMenuItem className="text-red-400 focus:text-red-400 flex items-center gap-2">
                   <Ban className="w-4 h-4" />

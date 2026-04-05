@@ -93,7 +93,7 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
           <Label className="text-slate-300">Quartier</Label>
           <Select
             defaultValue={(profile.quartier as string) || ''}
-            onValueChange={val => setValue('quartier', val, { shouldDirty: true })}
+            onValueChange={val => setValue('quartier', val || '', { shouldDirty: true })}
           >
             <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-12">
               <SelectValue />
@@ -111,7 +111,7 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
           <Label className="text-slate-300">Profession</Label>
           <Select
             defaultValue={(profile.profession as string) || ''}
-            onValueChange={val => setValue('profession', val, { shouldDirty: true })}
+            onValueChange={val => setValue('profession', val || '', { shouldDirty: true })}
           >
             <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-12">
               <SelectValue />

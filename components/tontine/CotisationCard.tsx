@@ -77,11 +77,11 @@ export function CotisationCard({ contribution, penaltyRate, userId }: Cotisation
             </div>
           ) : (
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
-              <DialogTrigger asChild>
+              <DialogTrigger render={
                 <Button className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6">
                   Payer
                 </Button>
-              </DialogTrigger>
+              } />
               <DialogContent className="bg-slate-900 border-slate-800 text-white">
                 <DialogHeader>
                   <DialogTitle>Règlement de cotisation</DialogTitle>
