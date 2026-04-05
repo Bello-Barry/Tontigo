@@ -5,12 +5,13 @@ import { Camera, User, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 
 interface AvatarUploadProps {
-  userId:   string
-  onUpload: (url: string) => void
+  userId:         string
+  onUpload:       (url: string) => void
+  initialAvatar?: string | null
 }
 
-export function AvatarUpload({ userId, onUpload }: AvatarUploadProps) {
-  const [preview, setPreview] = useState<string | null>(null)
+export function AvatarUpload({ userId, onUpload, initialAvatar }: AvatarUploadProps) {
+  const [preview, setPreview] = useState<string | null>(initialAvatar || null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const inputRef              = useRef<HTMLInputElement>(null)

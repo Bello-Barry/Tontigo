@@ -1,123 +1,180 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { GroupStatusBadge } from '@/components/tontine/GroupStatusBadge'
-import { SolidarityPoolCard } from '@/components/tontine/SolidarityPoolCard'
+import { notFound, redirect } from 'next/navigation'
+import { WalletSelector } from '@/components/shared/WalletSelector'
+import { Loader2, AlertTriangle, CheckCircle2, Wallet, Calendar, Users, Copy } from 'lucide-react'
+import type { Contribution } from '@/lib/types'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { TourTimeline } from '@/components/tontine/TourTimeline'
 import { CotisationCard } from '@/components/tontine/CotisationCard'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft, Users, AlertCircle, Play } from 'lucide-react'
-import { formatFCFA } from '@/lib/utils/format'
-import { startGroup } from '@/lib/actions/tontine.actions'
+import { MemberRow } from '@/components/tontine/MemberRow'
+import { SolidarityPoolCard } from '@/components/tontine/SolidarityPoolCard'
+import { GroupStatusBadge } from '@/components/tontine/GroupStatusBadge'
+import { StartGroupButton } from '@/components/tontine/StartGroupButton'
+import { formatFCFA, getFrequencyLabel } from '@/lib/utils/format'
 
-export default async function TontineDetailPage({ params }: { params: { id: string } }) {
+interface Props {
+  params: { id: string }
+}
+
+export default async function GroupDetailPage({ params }: Props) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-  // 1. Récupérer le groupe
+  // Récupérer le groupe
   const { data: group } = await supabase
     .from('tontine_groups')
-    .select('*, solidarity_pool(balance)')
+    .select(`
+      *,
+      creator:creator_id (id, full_name, avatar_url, trust_score, badge)
+    `)
     .eq('id', params.id)
     .single()
 
-  if (!group) redirect('/tontine')
+  if (!group) notFound()
 
-  // 2. Récupérer les memberships
+  // Vérifier que l'utilisateur est membre
+  const { data: myMembership } = await supabase
+    .from('memberships')
+    .select('*')
+    .eq('group_id', params.id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!myMembership) redirect('/tontine') // Pas membre → rediriger
+
+  // Récupérer tous les membres avec leurs profils
   const { data: memberships } = await supabase
     .from('memberships')
-    .select('*, user:users(*)')
+    .select(`
+      *,
+      user:user_id (id, full_name, avatar_url, trust_score, badge, status)
+    `)
     .eq('group_id', params.id)
+    .order('turn_position', { ascending: true })
 
-  const myMembership = memberships?.find(m => m.user_id === user!.id)
-  if (!myMembership) redirect('/tontine')
-
-  // 3. Récupérer ma cotisation en cours
-  const { data: currentContrib } = await supabase
+  // Récupérer la cotisation en cours de l'utilisateur
+  const { data: myCotisation } = await supabase
     .from('contributions')
     .select('*')
     .eq('membership_id', myMembership.id)
-    .in('status', ['en_attente', 'retard', 'penalise'])
+    .in('status', ['en_attente', 'retard'])
+    .order('due_date', { ascending: true })
+    .limit(1)
     .maybeSingle()
 
-  const isCreator = group.creator_id === user!.id
-  const potSize = group.amount * group.current_members
-  const poolBalance = group.solidarity_pool?.[0]?.balance || 0
+  // Récupérer le pool de solidarité
+  const { data: solidarityPool } = await supabase
+    .from('solidarity_pool')
+    .select('*')
+    .eq('group_id', params.id)
+    .single()
+
+  const isCreator = group.creator_id === user.id
 
   return (
-    <div className="space-y-8 pb-12">
-      <div className="flex items-center gap-4">
-        <Link href="/tontine">
-           <Button variant="ghost" size="icon" className="rounded-full"><ArrowLeft className="w-5 h-5" /></Button>
-        </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-             <h2 className="text-2xl font-bold">{group.name}</h2>
-             <GroupStatusBadge status={group.status} />
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+
+      {/* En-tête groupe */}
+      <div className="glass-card p-5 space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-white">{group.name}</h1>
+            {group.description && (
+              <p className="text-slate-400 text-sm mt-1">{group.description}</p>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground flexitems-center gap-2 mt-1">
-             <Users className="w-4 h-4 inline mr-1" /> {group.current_members}/{group.max_members} membres
-             <span className="mx-2">•</span>
-             Code d'invitation: <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-foreground">{group.invite_code}</span>
-          </p>
+          <GroupStatusBadge status={group.status} />
         </div>
-        
+
+        {/* Infos clés */}
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="bg-slate-700/50 rounded-xl p-3">
+            <p className="text-slate-400 text-xs">Cotisation</p>
+            <p className="text-white font-bold text-lg">{formatFCFA(group.amount)}</p>
+            <p className="text-slate-400 text-xs">{getFrequencyLabel(group.frequency)}</p>
+          </div>
+          <div className="bg-slate-700/50 rounded-xl p-3">
+            <p className="text-slate-400 text-xs">Membres</p>
+            <p className="text-white font-bold text-lg flex items-center gap-1">
+              <Users className="w-4 h-4 text-emerald-400" />
+              {group.current_members}/{group.max_members}
+            </p>
+            <p className="text-slate-400 text-xs">Tour {group.current_turn}</p>
+          </div>
+        </div>
+
+        {/* Code invitation (si créateur et groupe en attente) */}
         {isCreator && group.status === 'en_attente' && (
-          <form action={async () => {
-             'use server'
-             await startGroup(group.id)
-          }}>
-            <Button type="submit" disabled={group.current_members < 2} className="bg-emerald-600 hover:bg-emerald-700">
-              <Play className="w-4 h-4 mr-2" /> Démarrer
-            </Button>
-          </form>
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
+            <p className="text-emerald-400 text-xs mb-1">Code d'invitation</p>
+            <div className="flex items-center justify-between">
+              <code className="text-white font-mono text-lg tracking-widest">{group.invite_code}</code>
+              <button
+                onClick={() => navigator.clipboard.writeText(group.invite_code)}
+                className="p-1.5 rounded-lg hover:bg-slate-700 transition-colors"
+                title="Copier le code"
+              >
+                <Copy className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-card border rounded-xl p-6">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Cagnotte par tour</h3>
-              <div className="text-3xl font-extrabold text-primary">{formatFCFA(potSize)}</div>
-              <p className="text-sm text-muted-foreground mt-2">Cotisation: {formatFCFA(group.amount)}</p>
-            </div>
-            <SolidarityPoolCard balance={poolBalance} />
-          </div>
+      {/* Démarrer le groupe (créateur uniquement, si en_attente et ≥ 2 membres) */}
+      {isCreator && group.status === 'en_attente' && group.current_members >= 2 && (
+        <StartGroupButton groupId={group.id} />
+      )}
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold">Ma situation</h3>
-            {currentContrib ? (
-              <CotisationCard contribution={currentContrib as any} />
-            ) : group.status === 'actif' ? (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-xl p-4 flex items-center justify-between">
-                 <span className="font-medium">Tu es à jour pour ce tour.</span>
-              </div>
-            ) : (
-              <div className="bg-muted rounded-xl p-4 text-muted-foreground text-sm flex items-center gap-2">
-                 <AlertCircle className="w-4 h-4" /> La tontine n'a pas encore démarré.
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Ma cotisation en cours */}
+      {myCotisation && group.status === 'actif' && (
+        <section className="space-y-3">
+          <h2 className="text-slate-300 font-semibold">Ma cotisation</h2>
+          <CotisationCard
+            contribution={myCotisation}
+            penaltyRate={group.penalty_rate}
+            userId={user.id}
+          />
+        </section>
+      )}
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold">Déroulement</h3>
-            <Link href={`/tontine/${group.id}/members`}>
-              <Button variant="link" size="sm">Gérer les membres</Button>
-            </Link>
+      {/* Timeline des tours */}
+      {memberships && memberships.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-slate-300 font-semibold">Ordre des tours</h2>
+          <TourTimeline
+            memberships={memberships as any}
+            currentTurn={group.current_turn}
+            groupStatus={group.status}
+          />
+        </section>
+      )}
+
+      {/* Pool de solidarité */}
+      {solidarityPool && (
+        <SolidarityPoolCard balance={solidarityPool.balance} />
+      )}
+
+      {/* Liste des membres */}
+      {memberships && (
+        <section className="space-y-3">
+          <h2 className="text-slate-300 font-semibold">
+            Membres ({memberships.length})
+          </h2>
+          <div className="glass-card divide-y divide-slate-700/50">
+            {memberships.map(m => (
+              <MemberRow
+                key={m.id}
+                membership={m}
+                isCurrentUser={m.user_id === user.id}
+                isCreator={isCreator}
+                groupId={group.id}
+              />
+            ))}
           </div>
-          
-          <div className="bg-card border rounded-xl p-4">
-            <TourTimeline 
-              memberships={memberships as any} 
-              currentTurn={group.current_turn} 
-              groupStatus={group.status} 
-            />
-          </div>
-        </div>
-      </div>
+        </section>
+      )}
     </div>
   )
 }

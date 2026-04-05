@@ -1,99 +1,140 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { VaultCard } from '@/components/epargne/VaultCard'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft, ArrowDownRight, Info } from 'lucide-react'
-import Link from 'next/link'
-import { formatFCFA, formatDate, getDaysUntil } from '@/lib/utils/format'
+import { notFound, redirect } from 'next/navigation'
+import { VaultProgressBar } from '@/components/epargne/VaultProgressBar'
+import { VaultCountdown } from '@/components/epargne/VaultCountdown'
+import { WithdrawButton } from '@/components/epargne/WithdrawButton'
+import { DepositButton } from '@/components/epargne/DepositButton'
+import { formatFCFA, formatDate } from '@/lib/utils/format'
+import { Lock, LockOpen, Calendar } from 'lucide-react'
 
-export default async function VaultDetailPage({ params }: { params: { id: string } }) {
+interface Props {
+  params: { id: string }
+}
+
+export default async function VaultDetailPage({ params }: Props) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: vault } = await supabase
     .from('savings_vaults')
     .select('*')
     .eq('id', params.id)
-    .eq('user_id', user!.id)
+    .eq('user_id', user.id)
     .single()
 
-  if (!vault) redirect('/epargne')
+  if (!vault) notFound()
 
+  // Historique des versements
   const { data: contributions } = await supabase
     .from('savings_contributions')
     .select('*')
-    .eq('vault_id', vault.id)
+    .eq('vault_id', params.id)
     .order('paid_at', { ascending: false })
 
   const isUnlocked = vault.status === 'debloque'
-  const isFinished = vault.status === 'termine'
-  const daysLeft = getDaysUntil(vault.unlock_date)
+  const isActive   = vault.status === 'actif'
+  const progressPct = vault.target_amount
+    ? Math.min(100, Math.round((vault.current_balance / vault.target_amount) * 100))
+    : null
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <Link href="/epargne">
-         <Button variant="ghost" size="sm" className="mb-2 -ml-3 text-muted-foreground"><ArrowLeft className="w-4 h-4 mr-2" /> Retour</Button>
-      </Link>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <VaultCard vault={vault as any} />
-        </div>
-        
-        <div className="space-y-6">
-          <div className="bg-card border rounded-xl p-6">
-            <h3 className="font-bold text-lg mb-4">Informations</h3>
-            <ul className="space-y-3 text-sm">
-              <li className="flex justify-between border-b pb-2">
-                <span className="text-muted-foreground">Créé le</span>
-                <span className="font-medium">{formatDate(vault.created_at)}</span>
-              </li>
-              <li className="flex justify-between border-b pb-2">
-                <span className="text-muted-foreground">Date de déblocage</span>
-                <span className="font-medium">{formatDate(vault.unlock_date)}</span>
-              </li>
-              <li className="flex justify-between pb-2">
-                <span className="text-muted-foreground">Frais de retrait</span>
-                <span className="font-medium">0.5% à la sortie</span>
-              </li>
-            </ul>
+    <div className="p-6 max-w-lg mx-auto space-y-6">
+
+      {/* En-tête */}
+      <div className="glass-card p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          {isUnlocked
+            ? <LockOpen className="w-8 h-8 text-emerald-400" />
+            : <Lock className="w-8 h-8 text-amber-400" />
+          }
+          <div>
+            <h1 className="text-xl font-bold text-white">{vault.name}</h1>
+            {vault.description && <p className="text-slate-400 text-sm">{vault.description}</p>}
           </div>
+        </div>
 
-          {!isUnlocked && !isFinished && (
-            <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-xl flex gap-3 text-orange-600">
-              <Info className="w-5 h-5 shrink-0" />
-              <div className="text-sm">
-                <p className="font-bold">Déblocage dans {daysLeft} jour(s)</p>
-                <p className="mt-1 opacity-90">Les dépôts restent possibles, mais aucun retrait anticipé ne sera autorisé selon la règle de verrouillage Tontigo.</p>
-              </div>
-            </div>
+        {/* Solde */}
+        <div className="text-center py-4">
+          <p className="text-slate-400 text-sm">Solde actuel</p>
+          <p className="text-4xl font-bold tontigo-gradient-text mt-1">
+            {formatFCFA(vault.current_balance)}
+          </p>
+          {vault.target_amount && (
+            <p className="text-slate-400 text-sm mt-1">
+              sur {formatFCFA(vault.target_amount)} visés
+            </p>
           )}
+        </div>
+
+        {/* Barre de progression */}
+        {vault.target_amount && progressPct !== null && (
+          <VaultProgressBar
+            current={vault.current_balance}
+            target={vault.target_amount}
+            percentage={progressPct}
+          />
+        )}
+
+        {/* Date de déblocage */}
+        <div className="flex items-center gap-2 text-slate-400 text-sm">
+          <Calendar className="w-4 h-4" />
+          {isUnlocked
+            ? <span className="text-emerald-400 font-medium">Débloqué le {formatDate(vault.unlocked_at!)}</span>
+            : <span>Se débloque le <strong className="text-white">{formatDate(vault.unlock_date)}</strong></span>
+          }
         </div>
       </div>
 
-      <div className="space-y-4">
-        <h3 className="text-xl font-bold">Historique des dépôts</h3>
-        <div className="space-y-3">
-          {contributions?.length === 0 ? (
-            <div className="text-center p-8 bg-muted/30 rounded-xl text-muted-foreground text-sm">Aucun dépôt n'a encore été effectué.</div>
-          ) : (
-            contributions?.map(c => (
-              <div key={c.id} className="flex items-center justify-between p-4 bg-card border rounded-xl">
-                 <div className="flex items-center gap-3">
-                   <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-full">
-                     <ArrowDownRight className="w-4 h-4" />
-                   </div>
-                   <div>
-                     <p className="font-medium">Dépôt</p>
-                     <p className="text-xs text-muted-foreground">{formatDate(c.paid_at)}</p>
-                   </div>
-                 </div>
-                 <div className="font-bold text-emerald-500">+{formatFCFA(c.amount)}</div>
-              </div>
-            ))
-          )}
+      {/* Countdown */}
+      {isActive && <VaultCountdown unlockDate={vault.unlock_date} />}
+
+      {/* Message déblocage */}
+      {isUnlocked && vault.current_balance > 0 && (
+        <div className="glass-card p-4 text-center space-y-1">
+          <p className="text-2xl">🎉</p>
+          <p className="text-white font-bold">Ton coffre est débloqué !</p>
+          <p className="text-slate-400 text-sm">Tu peux maintenant retirer ton épargne.</p>
         </div>
+      )}
+
+      {/* Actions */}
+      <div className="space-y-3">
+        {/* Bouton Ajouter — toujours visible si actif */}
+        {isActive && (
+          <DepositButton vaultId={vault.id} />
+        )}
+
+        {/* ⚠️ Bouton Retirer — UNIQUEMENT si débloqué */}
+        {isUnlocked && vault.current_balance > 0 && (
+          <WithdrawButton vault={vault} />
+        )}
+
+        {/* Message si pas encore débloqué */}
+        {isActive && (
+          <p className="text-slate-500 text-xs text-center">
+            Le retrait sera disponible le {formatDate(vault.unlock_date)}
+          </p>
+        )}
       </div>
+
+      {/* Historique des versements */}
+      {contributions && contributions.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-slate-300 font-semibold">Historique ({contributions.length})</h2>
+          <div className="glass-card divide-y divide-slate-700/50">
+            {contributions.map(c => (
+              <div key={c.id} className="p-4 flex justify-between items-center">
+                <div>
+                  <p className="text-white text-sm">Versement</p>
+                  <p className="text-slate-400 text-xs">{formatDate(c.paid_at)}</p>
+                </div>
+                <p className="text-emerald-400 font-semibold">+{formatFCFA(c.amount)}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

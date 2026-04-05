@@ -1,62 +1,95 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { VaultCard } from '@/components/epargne/VaultCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
-import { PlusCircle } from 'lucide-react'
+import { formatFCFA } from '@/lib/utils/format'
+import { Plus, Lock } from 'lucide-react'
 import Link from 'next/link'
-import type { SavingsVault } from '@/lib/types'
 
-export default async function EpargneListPage() {
+export default async function EpargnePage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
+  // Récupérer tous les coffres de l'utilisateur
   const { data: vaults } = await supabase
     .from('savings_vaults')
     .select('*')
-    .eq('user_id', user!.id)
+    .eq('user_id', user.id)
+    .neq('status', 'termine')
     .order('created_at', { ascending: false })
 
-  const activeVaults = vaults?.filter(v => ['actif', 'debloque'].includes(v.status)) as unknown as SavingsVault[] || []
-  const finishedVaults = vaults?.filter(v => v.status === 'termine') as unknown as SavingsVault[] || []
+  const totalBalance = vaults?.reduce((sum, v) => sum + (v.current_balance ?? 0), 0) ?? 0
+  const activeVaults = vaults?.filter(v => v.status === 'actif') ?? []
+  const unlockedVaults = vaults?.filter(v => v.status === 'debloque') ?? []
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+
+      {/* En-tête */}
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Mon Épargne Bloquée</h2>
-          <p className="text-muted-foreground mt-1">Protégez votre argent de vous-même.</p>
+          <h1 className="text-2xl font-bold text-white">Épargne</h1>
+          <p className="text-slate-400 text-sm mt-1">{vaults?.length ?? 0} coffre{(vaults?.length ?? 0) > 1 ? 's' : ''}</p>
         </div>
         <Link href="/epargne/create">
-          <Button className="bg-blue-600 hover:bg-blue-700"><PlusCircle className="w-4 h-4 mr-2" /> Nouveau Coffre</Button>
+          <Button className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2">
+            <Plus className="w-4 h-4" />
+            Nouveau coffre
+          </Button>
         </Link>
       </div>
 
-      <div className="space-y-4">
-        <h3 className="font-semibold text-lg">Coffres en cours</h3>
-        {activeVaults.length === 0 ? (
-          <EmptyState 
-            title="Aucun coffre" 
-            description="L'épargne bloquée vous permet de mettre de l'argent de côté de façon stricte, sans possibilité de retrait avant la date fixée."
-            action={<Link href="/epargne/create"><Button variant="outline">Créer mon premier coffre</Button></Link>}
-          />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeVaults.map(vault => (
-              <VaultCard key={vault.id} vault={vault} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {finishedVaults.length > 0 && (
-        <div className="space-y-4 pt-8 border-t">
-          <h3 className="font-semibold text-lg text-muted-foreground">Coffres terminés</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-60 hover:opacity-100 transition-opacity">
-            {finishedVaults.map(vault => (
-              <VaultCard key={vault.id} vault={vault} />
-            ))}
-          </div>
+      {/* Solde total */}
+      {(vaults?.length ?? 0) > 0 && (
+        <div className="glass-card p-5 space-y-1">
+          <p className="text-slate-400 text-sm flex items-center gap-2">
+            <Lock className="w-4 h-4" /> Total épargné (bloqué)
+          </p>
+          <p className="text-3xl font-bold tontigo-gradient-text">{formatFCFA(totalBalance)}</p>
+          <p className="text-slate-500 text-xs">
+            {activeVaults.length} coffre{activeVaults.length > 1 ? 's' : ''} actif{activeVaults.length > 1 ? 's' : ''}
+            {unlockedVaults.length > 0 && ` · ${unlockedVaults.length} prêt${unlockedVaults.length > 1 ? 's' : ''} au retrait`}
+          </p>
         </div>
+      )}
+
+      {/* Coffres débloqués (priorité visuelle) */}
+      {unlockedVaults.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-slate-300 font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            Prêts au retrait ({unlockedVaults.length})
+          </h2>
+          {unlockedVaults.map(v => <VaultCard key={v.id} vault={v} />)}
+        </section>
+      )}
+
+      {/* Coffres actifs */}
+      {activeVaults.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-slate-300 font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 bg-yellow-500 rounded-full" />
+            En cours ({activeVaults.length})
+          </h2>
+          {activeVaults.map(v => <VaultCard key={v.id} vault={v} />)}
+        </section>
+      )}
+
+      {/* Empty state */}
+      {(vaults?.length ?? 0) === 0 && (
+        <EmptyState
+          title="Aucun coffre d'épargne"
+          description="Crée ton premier coffre et commence à épargner. L'argent reste bloqué jusqu'à la date que tu choisis."
+          action={
+            <Link href="/epargne/create">
+              <Button className="bg-emerald-500 hover:bg-emerald-600">
+                Créer un coffre
+              </Button>
+            </Link>
+          }
+        />
       )}
     </div>
   )

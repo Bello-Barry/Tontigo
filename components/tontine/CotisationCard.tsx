@@ -5,95 +5,123 @@ import { Button } from '@/components/ui/button'
 import { formatFCFA, formatDate, getDaysUntil } from '@/lib/utils/format'
 import { payContribution } from '@/lib/actions/tontine.actions'
 import { WalletSelector } from '@/components/shared/WalletSelector'
-import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Loader2, AlertTriangle, CheckCircle2, Wallet, Calendar } from 'lucide-react'
 import type { Contribution } from '@/lib/types'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
+import { toast } from 'react-toastify'
+import { useRouter } from 'next/navigation'
 
 interface CotisationCardProps {
   contribution: Contribution
+  penaltyRate?: number
+  userId?: string
 }
 
-export function CotisationCard({ contribution }: CotisationCardProps) {
+export function CotisationCard({ contribution, penaltyRate, userId }: CotisationCardProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedWallet, setSelectedWallet] = useState<'mtn'|'airtel'>('mtn')
+  const [selectedWallet, setSelectedWallet] = useState<'mtn' | 'airtel'>('mtn')
   const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter()
 
   const isPaid = contribution.status === 'paye'
-  const isLate = contribution.status === 'retard' || contribution.status === 'penalise'
+  const isLate = contribution.status === 'retard'
   const daysLeft = getDaysUntil(contribution.due_date)
 
   const handlePayment = async () => {
     setIsLoading(true)
-    const res = await payContribution(contribution.id, selectedWallet)
-    setIsLoading(false)
-    if (res.success || res.data) {
-      setIsOpen(false)
-    } else {
-      alert(res.error)
+    try {
+      const res = await payContribution(contribution.id, selectedWallet)
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('💰 Cotisation payée avec succès !')
+        setIsOpen(false)
+        router.refresh()
+      }
+    } catch (err) {
+      toast.error('Erreur lors du paiement.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const totalAmount = contribution.amount + (contribution.penalty_amount || 0)
+  const penaltyAmount = contribution.penalty_amount || 0
+  const totalAmount   = contribution.amount + penaltyAmount
 
   return (
-    <Card className={`overflow-hidden border-l-4 ${
+    <Card className={`glass-card overflow-hidden border-l-4 ${
       isPaid ? 'border-l-emerald-500' : 
       isLate ? 'border-l-red-500' : 
       'border-l-blue-500'
     }`}>
       <CardContent className="p-4 flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground flex items-center gap-1">
-            Échéance: <span className="font-medium text-foreground">{formatDate(contribution.due_date)}</span>
+        <div className="space-y-1">
+          <p className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
+            <Calendar className="w-3 h-3" />
+            Échéance: {formatDate(contribution.due_date)}
           </p>
-          <div className="text-2xl font-bold mt-1">
+          <div className="text-2xl font-bold text-white tracking-tight">
             {formatFCFA(totalAmount)}
           </div>
-          {contribution.penalty_amount > 0 && (
-            <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-              <AlertTriangle className="w-3 h-3" /> Inclut {formatFCFA(contribution.penalty_amount)} de pénalités
+          {penaltyAmount > 0 && (
+            <p className="text-[10px] text-red-400 flex items-center gap-1 font-bold uppercase tracking-wider">
+              <AlertTriangle className="w-3 h-3" /> Inclut {formatFCFA(penaltyAmount)} d'amende
             </p>
           )}
         </div>
 
-        <div>
+        <div className="flex flex-col items-end gap-2">
           {isPaid ? (
-            <div className="flex items-center gap-2 text-emerald-500 font-medium bg-emerald-500/10 px-3 py-1.5 rounded-full">
-              <CheckCircle2 className="w-4 h-4" /> Payé
+            <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
+              <CheckCircle2 className="w-4 h-4" /> PAYÉ
             </div>
           ) : (
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
-              <DialogTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
-                Payer
+              <DialogTrigger asChild>
+                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6">
+                  Payer
+                </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="bg-slate-900 border-slate-800 text-white">
                 <DialogHeader>
-                  <DialogTitle>Payer la cotisation</DialogTitle>
+                  <DialogTitle>Règlement de cotisation</DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    Saisie ton paiement mobile pour valider ton tour.
+                  </DialogDescription>
                 </DialogHeader>
-                <div className="py-4 space-y-4">
-                  <div className="bg-muted p-4 rounded-lg flex justify-between items-center text-lg font-bold">
-                    <span>Total à payer:</span>
-                    <span>{formatFCFA(totalAmount)}</span>
+                
+                <div className="py-2 space-y-6">
+                  <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50 flex justify-between items-center">
+                    <span className="text-slate-400 text-sm">Total à payer</span>
+                    <span className="text-2xl font-bold text-emerald-400">{formatFCFA(totalAmount)}</span>
                   </div>
                   
-                  <WalletSelector selected={selectedWallet} onSelect={setSelectedWallet} />
+                  <div className="space-y-3">
+                    <Label className="text-slate-300 flex items-center gap-2">
+                       <Wallet className="w-4 h-4" /> Mode de paiement
+                    </Label>
+                    <WalletSelector selected={selectedWallet} onSelect={setSelectedWallet} />
+                  </div>
                   
-                  <Button className="w-full" onClick={handlePayment} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Confirmer le paiement
+                  <Button className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-lg" onClick={handlePayment} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : 'Confirmer le paiement'}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           )}
           
-          {!isPaid && !isLate && (
-            <p className="text-[10px] text-muted-foreground text-center mt-2">
-              J-{daysLeft}
+          {!isPaid && (
+            <p className={`text-[10px] font-bold uppercase tracking-widest ${isLate ? 'text-red-400' : 'text-slate-500'}`}>
+              {isLate ? 'EN RETARD' : `J-${daysLeft}`}
             </p>
           )}
         </div>
       </CardContent>
     </Card>
   )
+}
+
+function Label({ children, className }: { children: React.ReactNode, className?: string }) {
+  return <label className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${className}`}>{children}</label>
 }

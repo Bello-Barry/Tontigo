@@ -1,64 +1,132 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { GroupCard } from '@/components/tontine/GroupCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
-import { PlusCircle, Search } from 'lucide-react'
-import Link from 'next/link'
-import type { TontineGroup } from '@/lib/types'
+import { Plus, QrCode, Search } from 'lucide-react'
 
-export default async function TontineListPage() {
+export default async function TontinePage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
+  // Récupérer tous les groupes de l'utilisateur avec les détails
   const { data: memberships } = await supabase
     .from('memberships')
-    .select('group_id')
-    .eq('user_id', user!.id)
+    .select(`
+      *,
+      tontine_groups (
+        *,
+        creator:creator_id (
+          id,
+          full_name,
+          avatar_url,
+          trust_score,
+          badge
+        )
+      )
+    `)
+    .eq('user_id', user.id)
+    .order('joined_at', { ascending: false })
 
-  let groups: TontineGroup[] = []
-  
-  if (memberships && memberships.length > 0) {
-    const groupIds = memberships.map(m => m.group_id)
-    const { data } = await supabase
-      .from('tontine_groups')
-      .select('*')
-      .in('id', groupIds)
-      .order('created_at', { ascending: false })
-      
-    if (data) groups = data as unknown as TontineGroup[]
-  }
+  const groups = memberships
+    ?.map(m => ({
+      ...m.tontine_groups,
+      my_membership: {
+        turn_position:    m.turn_position,
+        total_paid:       m.total_paid,
+        total_penalties:  m.total_penalties,
+        has_received_payout: m.has_received_payout,
+        status:           m.status,
+        guarantee_amount: m.guarantee_amount,
+      },
+    }))
+    .filter(Boolean) ?? []
+
+  const actifs     = groups.filter(g => g.status === 'actif')
+  const enAttente  = groups.filter(g => g.status === 'en_attente')
+  const termines   = groups.filter(g => g.status === 'termine')
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+
+      {/* En-tête */}
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Mes Tontines</h2>
-          <p className="text-muted-foreground mt-1">Gérez vos groupes et cotisations.</p>
+          <h1 className="text-2xl font-bold text-white">Mes Tontines</h1>
+          <p className="text-slate-400 text-sm mt-1">{groups.length} groupe{groups.length > 1 ? 's' : ''}</p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/tontine/join">
-            <Button variant="outline"><Search className="w-4 h-4 mr-2" /> Rejoindre</Button>
-          </Link>
-          <Link href="/tontine/create">
-            <Button><PlusCircle className="w-4 h-4 mr-2" /> Créer</Button>
-          </Link>
-        </div>
+        <Link href="/tontine/create">
+          <Button className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2">
+            <Plus className="w-4 h-4" />
+            Créer
+          </Button>
+        </Link>
       </div>
 
-      {groups.length === 0 ? (
-        <EmptyState 
-          title="Aucune tontine" 
-          description="Vous ne participez à aucun groupe pour le moment. Rejoignez un groupe existant ou créez le vôtre."
+      {/* Actions rapides */}
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/tontine/rejoindre">
+          <button className="w-full glass-card p-4 flex items-center gap-3 hover:border-emerald-500/50 transition-colors">
+            <QrCode className="w-5 h-5 text-emerald-400" />
+            <span className="text-white text-sm font-medium">Rejoindre par code</span>
+          </button>
+        </Link>
+        <Link href="/matching">
+          <button className="w-full glass-card p-4 flex items-center gap-3 hover:border-emerald-500/50 transition-colors">
+            <Search className="w-5 h-5 text-emerald-400" />
+            <span className="text-white text-sm font-medium">Trouver un groupe</span>
+          </button>
+        </Link>
+      </div>
+
+      {/* Groupes actifs */}
+      {actifs.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-slate-300 font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full" />
+            Actifs ({actifs.length})
+          </h2>
+          {actifs.map(g => <GroupCard key={g.id} group={g} myMembership={g.my_membership} />)}
+        </section>
+      )}
+
+      {/* En attente */}
+      {enAttente.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-slate-300 font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 bg-yellow-500 rounded-full" />
+            En attente ({enAttente.length})
+          </h2>
+          {enAttente.map(g => <GroupCard key={g.id} group={g} myMembership={g.my_membership} />)}
+        </section>
+      )}
+
+      {/* Terminés */}
+      {termines.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-slate-300 font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 bg-slate-500 rounded-full" />
+            Terminés ({termines.length})
+          </h2>
+          {termines.map(g => <GroupCard key={g.id} group={g} myMembership={g.my_membership} />)}
+        </section>
+      )}
+
+      {/* Empty state */}
+      {groups.length === 0 && (
+        <EmptyState
+          title="Aucune tontine pour l'instant"
+          description="Crée ton premier groupe ou rejoins-en un via un code d'invitation."
           action={
-            <Link href="/tontine/create"><Button>Créer un groupe</Button></Link>
+            <Link href="/tontine/create">
+              <Button className="bg-emerald-500 hover:bg-emerald-600">
+                Créer un groupe
+              </Button>
+            </Link>
           }
         />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {groups.map(group => (
-            <GroupCard key={group.id} group={group} />
-          ))}
-        </div>
       )}
     </div>
   )

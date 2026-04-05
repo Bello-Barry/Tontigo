@@ -40,7 +40,7 @@ export async function createGroup(input: CreateGroupInput): Promise<ActionResult
   })
 
   revalidatePath('/tontine')
-  return { data: group }
+  return { data: group, success: true }
 }
 
 export async function joinGroupByCode(invite_code: string): Promise<ActionResult<TontineGroup>> {
@@ -99,7 +99,7 @@ export async function joinGroupByCode(invite_code: string): Promise<ActionResult
   }
 
   revalidatePath('/tontine')
-  return { data: group }
+  return { data: group, success: true }
 }
 
 export async function startGroup(groupId: string): Promise<ActionResult> {
@@ -218,7 +218,7 @@ export async function payContribution(
   await checkAndProcessPayout(contribution.group_id)
 
   revalidatePath(`/tontine/${contribution.group_id}`)
-  return { data: { reference: paymentRef } }
+  return { data: { reference: paymentRef }, success: true }
 }
 
 // Vérifier si toutes les cotisations sont payées et verser la cagnotte

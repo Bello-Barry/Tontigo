@@ -20,7 +20,7 @@ export async function createVault(input: CreateVaultInput): Promise<ActionResult
 
   if (error) return { error: error.message }
   revalidatePath('/epargne')
-  return { data }
+  return { data, success: true }
 }
 
 export async function depositToVault(
@@ -117,5 +117,5 @@ export async function withdrawFromVault(vaultId: string): Promise<ActionResult<{
   })
 
   revalidatePath('/epargne')
-  return { data: { netAmount } }
+  return { data: { netAmount }, success: true }
 }
