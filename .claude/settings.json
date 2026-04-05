@@ -1,0 +1,16 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "ANTHROPIC_AUTH_TOKEN": "sk-or-REMPLACE_PAR_TA_CLE_OPENROUTER",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "anthropic/claude-sonnet-4",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "google/gemini-flash-1.5",
+    "DISABLE_TELEMETRY": "1"
+  },
+  "permissions": {
+    "allow": [],
+    "deny": [
+      "Bash(rm -rf:*)"
+    ]
+  }
+}

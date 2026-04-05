@@ -6,10 +6,12 @@ import type { Contribution } from '@/lib/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { TourTimeline } from '@/components/tontine/TourTimeline'
 import { CotisationCard } from '@/components/tontine/CotisationCard'
+import { ContributionHistory } from '@/components/tontine/ContributionHistory'
 import { MemberRow } from '@/components/tontine/MemberRow'
 import { SolidarityPoolCard } from '@/components/tontine/SolidarityPoolCard'
 import { GroupStatusBadge } from '@/components/tontine/GroupStatusBadge'
 import { StartGroupButton } from '@/components/tontine/StartGroupButton'
+import { CopyInviteCode } from '@/components/tontine/CopyInviteCode'
 import { formatFCFA, getFrequencyLabel } from '@/lib/utils/format'
 
 interface Props {
@@ -23,26 +25,66 @@ export default async function GroupDetailPage(props: Props) {
   if (!user) redirect('/login')
 
   // Récupérer le groupe
-  const { data: group } = await supabase
+  const { data: group, error: groupError } = await supabase
     .from('tontine_groups')
-    .select(`
-      *,
-      creator:creator_id (id, full_name, avatar_url, trust_score, badge)
-    `)
+    .select('*')
     .eq('id', params.id)
-    .single()
+    .maybeSingle()
+
+  if (!group || groupError) notFound()
 
   if (!group) notFound()
 
-  // Vérifier que l'utilisateur est membre
-  const { data: myMembership } = await supabase
-    .from('memberships')
-    .select('*')
-    .eq('group_id', params.id)
-    .eq('user_id', user.id)
-    .single()
+  // ─── VÉRIFICATION D'ACCÈS ─────────────────────────────────────
+  // RÈGLE : le créateur a toujours accès, même si le membership
+  // n'est pas encore visible (délai RLS après création).
+  const isCreator = group.creator_id === user.id
 
-  if (!myMembership) redirect('/tontine') // Pas membre → rediriger
+  // Si pas créateur → vérifier le membership
+  let myMembership: any = null
+
+  if (isCreator) {
+    // Le créateur : récupérer son membership directement par user_id + group_id
+    // Utiliser .maybeSingle() sans redirect si null (il vient peut-être de créer)
+    const { data: creatorMembership } = await supabase
+      .from('memberships')
+      .select('*')
+      .eq('group_id', params.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    // Si le membership du créateur n'est pas encore visible (délai RLS),
+    // construire un membership minimal pour ne pas bloquer l'affichage
+    myMembership = creatorMembership ?? {
+      id:                  'pending',
+      group_id:            params.id,
+      user_id:             user.id,
+      turn_position:       1,
+      guarantee_amount:    0,
+      guarantee_paid:      false,
+      total_paid:          0,
+      total_penalties:     0,
+      has_received_payout: false,
+      payout_received_at:  null,
+      status:              'actif',
+      joined_at:           new Date().toISOString(),
+    }
+  } else {
+    // Pas créateur → vérifier le membership normalement
+    const { data: membershipData } = await supabase
+      .from('memberships')
+      .select('*')
+      .eq('group_id', params.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!membershipData) {
+      // Vraiment pas membre → rediriger
+      redirect('/tontine')
+    }
+
+    myMembership = membershipData
+  }
 
   // Récupérer tous les membres avec leurs profils
   const { data: memberships } = await supabase
@@ -64,14 +106,20 @@ export default async function GroupDetailPage(props: Props) {
     .limit(1)
     .maybeSingle()
 
+  // Récupérer tout l'historique des versements
+  const { data: contributionHistory } = await supabase
+    .from('contributions')
+    .select('*')
+    .eq('membership_id', myMembership.id)
+    .neq('status', 'penalise')
+    .order('due_date', { ascending: false })
+
   // Récupérer le pool de solidarité
   const { data: solidarityPool } = await supabase
     .from('solidarity_pool')
     .select('*')
     .eq('group_id', params.id)
     .single()
-
-  const isCreator = group.creator_id === user.id
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
@@ -111,13 +159,7 @@ export default async function GroupDetailPage(props: Props) {
             <p className="text-emerald-400 text-xs mb-1">Code d'invitation</p>
             <div className="flex items-center justify-between">
               <code className="text-white font-mono text-lg tracking-widest">{group.invite_code}</code>
-              <button
-                onClick={() => navigator.clipboard.writeText(group.invite_code)}
-                className="p-1.5 rounded-lg hover:bg-slate-700 transition-colors"
-                title="Copier le code"
-              >
-                <Copy className="w-4 h-4 text-slate-400" />
-              </button>
+              <CopyInviteCode code={group.invite_code} />
             </div>
           </div>
         )}
@@ -128,16 +170,43 @@ export default async function GroupDetailPage(props: Props) {
         <StartGroupButton groupId={group.id} />
       )}
 
-      {/* Ma cotisation en cours */}
-      {myCotisation && group.status === 'actif' && (
+      {/* Ma cotisation à payer */}
+      {group.status === 'actif' ? (
+        <>
+          {myCotisation && (
+            <section className="space-y-3">
+              <h2 className="text-slate-300 font-semibold">Ma cotisation à payer</h2>
+              <CotisationCard
+                contribution={myCotisation}
+                penaltyRate={group.penalty_rate}
+                userId={user.id}
+              />
+            </section>
+          )}
+        </>
+      ) : (
         <section className="space-y-3">
           <h2 className="text-slate-300 font-semibold">Ma cotisation</h2>
-          <CotisationCard
-            contribution={myCotisation}
-            penaltyRate={group.penalty_rate}
-            userId={user.id}
-          />
+          <div className="glass-card p-5 space-y-3">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
+              <p className="text-blue-400 text-sm font-medium">💡 Groupe en attente de démarrage</p>
+              <p className="text-slate-300 text-sm mt-2">
+                Montant de la cotisation: <span className="font-bold text-white">{formatFCFA(group.amount)}</span>
+              </p>
+              <p className="text-slate-400 text-xs mt-1">
+                Fréquence: <span className="font-semibold">{getFrequencyLabel(group.frequency)}</span>
+              </p>
+              <p className="text-slate-400 text-xs mt-3">
+                Les versements seront disponibles une fois que le groupe sera démarré par le créateur.
+              </p>
+            </div>
+          </div>
         </section>
+      )}
+
+      {/* Historique des versements */}
+      {contributionHistory && contributionHistory.length > 0 && (
+        <ContributionHistory contributions={contributionHistory as any} />
       )}
 
       {/* Timeline des tours */}

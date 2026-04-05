@@ -13,28 +13,25 @@ export default async function TontinePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Récupérer tous les groupes de l'utilisateur avec les détails
+  // Récupérer les memberships de l'utilisateur
   const { data: memberships } = await supabase
     .from('memberships')
-    .select(`
-      *,
-      group:group_id (
-        *,
-        creator:creator_id (
-          id,
-          full_name,
-          avatar_url,
-          trust_score,
-          badge
-        )
-      )
-    `)
+    .select('*')
     .eq('user_id', user.id)
     .order('joined_at', { ascending: false })
 
-  const groups = memberships
-    ?.map(m => {
-      const g = m.group as any
+  // Récupérer les groupes correspondants (même si memberships vide)
+  let groups: any[] = []
+  if (memberships && memberships.length > 0) {
+    const groupIds = memberships.map(m => m.group_id)
+    const { data: allGroups } = await supabase
+      .from('tontine_groups')
+      .select('*')
+      .in('id', groupIds)
+
+    // Combiner les données
+    groups = memberships.map(m => {
+      const g = allGroups?.find(group => group.id === m.group_id)
       if (!g) return null
       return {
         ...g,
@@ -47,8 +44,8 @@ export default async function TontinePage() {
           guarantee_amount: m.guarantee_amount,
         },
       }
-    })
-    .filter(Boolean) ?? []
+    }).filter(Boolean)
+  }
 
   const actifs     = groups.filter(g => g.status === 'actif')
   const enAttente  = groups.filter(g => g.status === 'en_attente')
@@ -73,14 +70,14 @@ export default async function TontinePage() {
 
       {/* Actions rapides */}
       <div className="grid grid-cols-2 gap-3">
-        <Link href="/tontine/rejoindre">
-          <button className="w-full glass-card p-4 flex items-center gap-3 hover:border-emerald-500/50 transition-colors">
+        <Link href="/tontine/join">
+          <button type="button" className="w-full glass-card p-4 flex items-center gap-3 hover:border-emerald-500/50 transition-colors">
             <QrCode className="w-5 h-5 text-emerald-400" />
             <span className="text-white text-sm font-medium">Rejoindre par code</span>
           </button>
         </Link>
         <Link href="/matching">
-          <button className="w-full glass-card p-4 flex items-center gap-3 hover:border-emerald-500/50 transition-colors">
+          <button type="button" className="w-full glass-card p-4 flex items-center gap-3 hover:border-emerald-500/50 transition-colors">
             <Search className="w-5 h-5 text-emerald-400" />
             <span className="text-white text-sm font-medium">Trouver un groupe</span>
           </button>

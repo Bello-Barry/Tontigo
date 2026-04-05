@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ProfileForm } from '@/components/auth/ProfileForm'
 import { TrustScoreBadge } from '@/components/shared/TrustScoreBadge'
 import { UserBadge } from '@/components/shared/UserBadge'
+import { LogoutButton } from '@/components/auth/LogoutButton'
 import { formatDate } from '@/lib/utils/format'
 import Image from 'next/image'
 import { User, Shield } from 'lucide-react'
@@ -12,13 +13,32 @@ export default async function ProfilPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('users')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (!profile) redirect('/onboarding')
+  // ── Si le profil n'existe pas dans public.users ──────────────
+  // Cela arrive quand le trigger handle_new_user a échoué.
+  // On crée le profil minimal et on redirige vers l'onboarding.
+  if (profileError || !profile) {
+    console.error('Profil manquant pour user:', user.id, profileError?.message)
+
+    // Créer le profil minimal via serviceClient
+    const { createClient } = await import('@supabase/supabase-js')
+    const service = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    await service.from('users').upsert({
+      id:         user.id,
+      phone:      user.phone ?? user.user_metadata?.phone ?? '',
+      full_name:  'Utilisateur',
+    })
+
+    redirect('/onboarding')
+  }
 
   return (
     <div className="p-6 max-w-lg mx-auto space-y-6">
@@ -81,7 +101,22 @@ export default async function ProfilPage() {
       </div>
 
       {/* Formulaire de modification */}
-      <ProfileForm profile={profile} userId={user.id} />
+      <ProfileForm
+        userId={user.id}
+        initialData={{
+          full_name:     profile.full_name     ?? '',
+          quartier:      profile.quartier      ?? '',
+          profession:    profile.profession    ?? '',
+          wallet_mtn:    profile.wallet_mtn    ?? '',
+          wallet_airtel: profile.wallet_airtel ?? '',
+          avatar_url:    profile.avatar_url    ?? '',
+        }}
+      />
+
+      {/* Bouton Déconnexion */}
+      <div className="pt-4 border-t border-slate-700">
+        <LogoutButton />
+      </div>
     </div>
   )
 }

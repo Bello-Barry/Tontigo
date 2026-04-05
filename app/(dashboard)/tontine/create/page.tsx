@@ -55,7 +55,11 @@ export default function CreateGroupPage() {
         return
       }
       toast.success('✅ Groupe créé avec succès !')
-      // Rediriger vers la page du nouveau groupe
+
+      // Attendre 500ms pour laisser Supabase propager le membership
+      // avant de naviguer vers la page du groupe
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       router.push(`/tontine/${result.data!.id}`)
     } catch {
       toast.error('Une erreur inattendue est survenue.')

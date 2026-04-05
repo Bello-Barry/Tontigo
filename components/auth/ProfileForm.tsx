@@ -15,7 +15,6 @@ import {
 import { Loader2, Save } from 'lucide-react'
 import { BRAZZAVILLE_QUARTIERS, PROFESSIONS } from '@/lib/utils/onboarding'
 import { useRouter } from 'next/navigation'
-import type { UserProfile } from '@/lib/types'
 
 const profileUpdateSchema = z.object({
   full_name:     z.string().min(3).max(60),
@@ -28,23 +27,30 @@ const profileUpdateSchema = z.object({
 type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>
 
 interface ProfileFormProps {
-  profile: UserProfile
-  userId:  string
+  initialData: {
+    full_name: string
+    quartier: string
+    profession: string
+    wallet_mtn: string
+    wallet_airtel: string
+    avatar_url: string
+  }
+  userId: string
 }
 
-export function ProfileForm({ profile, userId }: ProfileFormProps) {
-  const [loading, setLoading]   = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? '')
+export function ProfileForm({ initialData, userId }: ProfileFormProps) {
+  const [loading, setLoading] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState(initialData.avatar_url ?? '')
   const router = useRouter()
 
   const { register, handleSubmit, setValue, formState: { errors, isDirty } } = useForm<ProfileUpdateInput>({
     resolver: zodResolver(profileUpdateSchema),
     defaultValues: {
-      full_name:     profile.full_name,
-      quartier:      profile.quartier      ?? '',
-      profession:    profile.profession    ?? '',
-      wallet_mtn:    profile.wallet_mtn    ?? '',
-      wallet_airtel: profile.wallet_airtel ?? '',
+      full_name:     initialData.full_name,
+      quartier:      initialData.quartier      ?? '',
+      profession:    initialData.profession    ?? '',
+      wallet_mtn:    initialData.wallet_mtn    ?? '',
+      wallet_airtel: initialData.wallet_airtel ?? '',
     },
   })
 
@@ -92,7 +98,7 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
         <div className="space-y-2">
           <Label className="text-slate-300">Quartier</Label>
           <Select
-            defaultValue={(profile.quartier as string) || ''}
+            defaultValue={(initialData.quartier as string) || ''}
             onValueChange={val => setValue('quartier', val || '', { shouldDirty: true })}
           >
             <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-12">
@@ -110,7 +116,7 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
         <div className="space-y-2">
           <Label className="text-slate-300">Profession</Label>
           <Select
-            defaultValue={(profile.profession as string) || ''}
+            defaultValue={(initialData.profession as string) || ''}
             onValueChange={val => setValue('profession', val || '', { shouldDirty: true })}
           >
             <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-12">

@@ -23,7 +23,7 @@ export function JoinGroupForm() {
     setIsLoading(true)
     setErrorLine('')
     
-    const res = await joinGroupByCode(data.invite_code.toUpperCase())
+    const res = await joinGroupByCode(data.invite_code.toLowerCase())
     
     if (res.error) {
       setErrorLine(res.error)
@@ -41,8 +41,8 @@ export function JoinGroupForm() {
         </Label>
         <Input 
           id="code" 
-          placeholder="Ex: A1B2C3D4" 
-          className="uppercase tracking-widest text-center"
+          placeholder="Ex: a1b2c3d4" 
+          className="lowercase tracking-widest text-center"
           maxLength={8}
           {...register('invite_code')} 
         />

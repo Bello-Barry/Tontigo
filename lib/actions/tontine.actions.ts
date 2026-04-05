@@ -39,7 +39,10 @@ export async function createGroup(input: CreateGroupInput): Promise<ActionResult
     guarantee_amount: guarantee,
   })
 
+  // Invalider le cache de la liste ET de la page du nouveau groupe
   revalidatePath('/tontine')
+  revalidatePath(`/tontine/${group.id}`)
+
   return { data: group, success: true }
 }
 
