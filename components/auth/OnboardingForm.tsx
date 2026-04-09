@@ -139,7 +139,7 @@ export function OnboardingForm({ userId }: OnboardingFormProps) {
         <form onSubmit={handleStep1} className="space-y-6">
           <div className="text-center">
             <h2 className="text-xl font-bold text-white">Qui es-tu ?</h2>
-            <p className="text-slate-400 text-sm mt-1">Ton identité sur Tontigo</p>
+            <p className="text-slate-400 text-sm mt-1">Ton identité sur Likelemba</p>
           </div>
 
           <AvatarUpload userId={userId} onUpload={setAvatarUrl} />

@@ -17,8 +17,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tontigo",
+  title: "Likelemba",
   description: "L'épargne et la tontine sécurisée au Congo",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Likelemba",
+  },
+};
+
+export const viewport = {
+  themeColor: "#004d40",
 };
 
 export default function RootLayout({
@@ -40,6 +50,17 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if ('serviceWorker' in navigator) {
+                  window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js');
+                  });
+                }
+              `,
+            }}
+          />
           <ToastContainer
             position="top-right"
             autoClose={4000}

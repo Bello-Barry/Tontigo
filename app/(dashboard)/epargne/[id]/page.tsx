@@ -58,7 +58,7 @@ export default async function VaultDetailPage(props: Props) {
         {/* Solde */}
         <div className="text-center py-4">
           <p className="text-slate-400 text-sm">Solde actuel</p>
-          <p className="text-4xl font-bold tontigo-gradient-text mt-1">
+          <p className="text-4xl font-bold likelemba-gradient-text mt-1">
             {formatFCFA(vault.current_balance)}
           </p>
           {vault.target_amount && (

@@ -178,7 +178,7 @@ export const onboardingStep1Schema = z.object({
     .min(1, 'La date de naissance est requise')
     .refine(
       (date) => isAdult(date),
-      'Tu dois avoir au moins 18 ans pour utiliser Tontigo'
+      'Tu dois avoir au moins 18 ans pour utiliser Likelemba'
     )
     .refine(
       (date) => new Date(date) > new Date('1900-01-01'),
@@ -570,7 +570,7 @@ export function OnboardingForm({ userId }: OnboardingFormProps) {
         <form onSubmit={handleStep1} className="space-y-6">
           <div className="text-center">
             <h2 className="text-xl font-bold text-white">Qui es-tu ?</h2>
-            <p className="text-slate-400 text-sm mt-1">Ton identité sur Tontigo</p>
+            <p className="text-slate-400 text-sm mt-1">Ton identité sur Likelemba</p>
           </div>
 
           {/* Avatar */}
@@ -679,7 +679,7 @@ export function OnboardingForm({ userId }: OnboardingFormProps) {
           <div className="text-center">
             <h2 className="text-xl font-bold text-white">Tes wallets</h2>
             <p className="text-slate-400 text-sm mt-1">
-              Pour recevoir et envoyer de l'argent via Tontigo
+              Pour recevoir et envoyer de l'argent via Likelemba
             </p>
           </div>
 
@@ -819,7 +819,7 @@ export default async function OnboardingPage() {
 
         {/* En-tête */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold tontigo-gradient-text">Tontigo</h1>
+          <h1 className="text-3xl font-bold tontigo-gradient-text">Likelemba</h1>
           <p className="text-slate-400 text-sm mt-1">
             Bienvenue ! Complète ton profil pour commencer 🇨🇬
           </p>
@@ -1005,4 +1005,4 @@ export interface UserProfile {
 
 ---
 
-*Fix onboarding Tontigo — Profil complet 3 étapes · Brazzaville · Production Ready*
+*Fix onboarding Likelemba — Profil complet 3 étapes · Brazzaville · Production Ready*

@@ -18,7 +18,7 @@ export default async function AdminPage() {
     <div className="space-y-8 animate-in fade-in">
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-primary flex items-center gap-2">
-           <ShieldCheck className="w-6 h-6" /> Administration Tontigo
+           <ShieldCheck className="w-6 h-6" /> Administration Likelemba
         </h2>
         <p className="text-muted-foreground mt-1">Tableau de bord fondateur et revenus générés.</p>
       </div>

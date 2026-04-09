@@ -97,9 +97,9 @@ export function CreateGroupForm() {
           <ShieldAlert className="w-5 h-5" />
         </div>
         <div>
-          <h4 className="font-semibold text-sm">Garantie anti-fuite Tontigo</h4>
+          <h4 className="font-semibold text-sm">Garantie anti-fuite Likelemba</h4>
           <p className="text-xs text-muted-foreground mt-1 mb-3">
-             Pour protéger le groupe, Tontigo peut exiger une garantie bloquée aux membres recevant la cagnotte en premier. 
+             Pour protéger le groupe, Likelemba peut exiger une garantie bloquée aux membres recevant la cagnotte en premier.
              La garantie est restituée à la fin de la tontine.
           </p>
           <div className="flex items-center space-x-2">
@@ -117,7 +117,7 @@ export function CreateGroupForm() {
         <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-center">
            <span className="text-sm text-green-600 block">Cagnotte estimée par tour</span>
            <span className="text-2xl font-bold text-green-700">{new Intl.NumberFormat('fr-CG').format(amountToReceive)} FCFA</span>
-           <p className="text-xs text-muted-foreground mt-1 opacity-70">-1.5% frais de sécurisation Tontigo appliqués lors du versement</p>
+           <p className="text-xs text-muted-foreground mt-1 opacity-70">-1.5% frais de sécurisation Likelemba appliqués lors du versement</p>
         </div>
       )}
 

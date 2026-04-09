@@ -56,7 +56,7 @@ export default async function MembersPage({ params }: { params: { id: string } }
       
       <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-sm text-red-400 flex items-start gap-3 mt-8">
         <Flag className="w-5 h-5 shrink-0" />
-        <p>Le créateur peut signaler un membre comme <strong className="text-red-300">Fugitif</strong> s'il disparaît après avoir reçu sa cagnotte. Cela le bannit définitivement de Tontigo.</p>
+        <p>Le créateur peut signaler un membre comme <strong className="text-red-300">Fugitif</strong> s'il disparaît après avoir reçu sa cagnotte. Cela le bannit définitivement de Likelemba.</p>
       </div>
     </div>
   )

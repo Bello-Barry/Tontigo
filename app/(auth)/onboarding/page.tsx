@@ -24,7 +24,8 @@ export default async function OnboardingPage() {
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold tontigo-gradient-text">Tontigo</h1>
+          <img src="/logo.png" alt="Likelemba Logo" className="w-24 h-24 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold likelemba-gradient-text">Likelemba</h1>
           <p className="text-slate-400 text-sm mt-1">
             Bienvenue ! Complète ton profil pour commencer 🇨🇬
           </p>

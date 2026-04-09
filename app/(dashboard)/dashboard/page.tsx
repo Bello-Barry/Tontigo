@@ -67,7 +67,7 @@ export default async function DashboardPage() {
         <Card className="glass-card relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Niveau Tontigo</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Niveau Likelemba</CardTitle>
             <Activity className="w-4 h-4 text-orange-500" />
           </CardHeader>
           <CardContent>

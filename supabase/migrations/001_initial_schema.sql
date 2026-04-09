@@ -122,7 +122,7 @@ CREATE TABLE public.payouts (
   recipient_id        UUID NOT NULL REFERENCES public.users(id),
   membership_id       UUID NOT NULL REFERENCES public.memberships(id),
   amount              NUMERIC(12,2) NOT NULL,   -- montant brut (cotisations × membres)
-  commission_amount   NUMERIC(12,2) DEFAULT 0,  -- 1.5% prélevé par Tontigo
+  commission_amount   NUMERIC(12,2) DEFAULT 0,  -- 1.5% prélevé par Likelemba
   net_amount          NUMERIC(12,2) NOT NULL,   -- montant reçu par le membre
   turn_number         INTEGER NOT NULL,
   status              payout_status DEFAULT 'en_attente',
@@ -219,7 +219,7 @@ CREATE TABLE public.transactions (
 );
 
 -- ============================================================
--- TABLE: platform_revenues (revenus Tontigo)
+-- TABLE: platform_revenues (revenus Likelemba)
 -- ============================================================
 CREATE TABLE public.platform_revenues (
   id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

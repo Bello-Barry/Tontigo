@@ -49,7 +49,7 @@ export default async function EpargnePage() {
           <p className="text-slate-400 text-sm flex items-center gap-2">
             <Lock className="w-4 h-4" /> Total épargné (bloqué)
           </p>
-          <p className="text-3xl font-bold tontigo-gradient-text">{formatFCFA(totalBalance)}</p>
+          <p className="text-3xl font-bold likelemba-gradient-text">{formatFCFA(totalBalance)}</p>
           <p className="text-slate-500 text-xs">
             {activeVaults.length} coffre{activeVaults.length > 1 ? 's' : ''} actif{activeVaults.length > 1 ? 's' : ''}
             {unlockedVaults.length > 0 && ` · ${unlockedVaults.length} prêt${unlockedVaults.length > 1 ? 's' : ''} au retrait`}

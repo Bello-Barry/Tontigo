@@ -4,7 +4,7 @@
 
 ## 🎯 CONTEXTE
 
-L'application Tontigo utilise actuellement une authentification OTP par SMS via Supabase,
+L'application Likelemba utilise actuellement une authentification OTP par SMS via Supabase,
 qui nécessite un provider externe payant non disponible gratuitement.
 
 **Objectif** : Remplacer entièrement ce système par une auth **Numéro de téléphone + PIN à 4 chiffres**,
@@ -175,7 +175,7 @@ export async function registerWithPin(
     .maybeSingle()
 
   if (blacklisted) {
-    return { error: 'Ce numéro est banni de la plateforme Tontigo.' }
+    return { error: 'Ce numéro est banni de la plateforme Likelemba.' }
   }
 
   // Vérifier si le numéro existe déjà
@@ -242,7 +242,7 @@ export async function loginWithPin(
 
   if (profile?.is_banned) {
     await supabase.auth.signOut()
-    return { error: 'Ce compte est banni de la plateforme Tontigo.' }
+    return { error: 'Ce compte est banni de la plateforme Likelemba.' }
   }
 
   // Rediriger vers onboarding si profil incomplet
@@ -576,7 +576,7 @@ export function CreatePinForm({ onSubmit, loading, error }: CreatePinFormProps) 
       <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
         <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
         <p className="text-amber-300/80 text-xs">
-          Ne partage jamais ton PIN. Tontigo ne te le demandera jamais.
+          Ne partage jamais ton PIN. Likelemba ne te le demandera jamais.
         </p>
       </div>
     </div>
@@ -630,7 +630,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold tontigo-gradient-text">Tontigo</h1>
+          <h1 className="text-3xl font-bold tontigo-gradient-text">Likelemba</h1>
           <p className="text-slate-400 text-sm mt-1">La tontine digitale de confiance</p>
         </div>
 
@@ -722,7 +722,7 @@ function RegisterContent() {
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold tontigo-gradient-text">Tontigo</h1>
+          <h1 className="text-3xl font-bold tontigo-gradient-text">Likelemba</h1>
           <p className="text-slate-400 text-sm mt-1">La tontine digitale de confiance</p>
         </div>
 
@@ -841,4 +841,4 @@ Tester ces scénarios après implémentation :
 
 ---
 
-*Fix auth Tontigo — Numéro + PIN · 100% gratuit · Zéro SMS · Zéro email · Supabase natif*
+*Fix auth Likelemba — Numéro + PIN · 100% gratuit · Zéro SMS · Zéro email · Supabase natif*
