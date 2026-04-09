@@ -41,7 +41,7 @@ export const onboardingStep1Schema = z.object({
     .min(1, 'La date de naissance est requise')
     .refine(
       (date) => isAdult(date),
-      'Tu dois avoir au moins 18 ans pour utiliser Tontigo'
+      'Tu dois avoir au moins 18 ans pour utiliser Likelemba'
     )
     .refine(
       (date) => new Date(date) > new Date('1900-01-01'),

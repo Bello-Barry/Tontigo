@@ -30,8 +30,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Header (Topbar) */}
         <header className="h-16 border-b bg-card/50 backdrop-blur flex items-center justify-between px-4 md:px-8 z-10">
-          <div className="md:hidden">
-             <h1 className="text-xl font-bold text-primary">Tontigo<span className="text-green-500">.</span></h1>
+          <div className="md:hidden flex items-center gap-2">
+             <img src="/logo.png" alt="Logo" className="w-8 h-8" />
+             <h1 className="text-xl font-bold text-primary">Likelemba</h1>
           </div>
           
           <div className="hidden md:flex gap-4 items-center">

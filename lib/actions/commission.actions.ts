@@ -31,7 +31,7 @@ export async function chargeMatchingFee(userId: string, requestId: string): Prom
     reference_id:       requestId,
     type:               'matching_fee',
     amount:             FEE,
-    description:        'Frais de mise en relation Tontigo',
+    description:        'Frais de mise en relation Likelemba',
     external_reference: ref,
   })
 
@@ -64,7 +64,7 @@ export async function activateProSubscription(userId: string, walletType: 'mtn' 
     user_id:            userId,
     type:               'abonnement',
     amount:             PRICE,
-    description:        'Abonnement Tontigo Pro — 1 mois',
+    description:        'Abonnement Likelemba Pro — 1 mois',
     wallet_used:        walletType,
     external_reference: ref,
   })

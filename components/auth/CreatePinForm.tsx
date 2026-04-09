@@ -59,7 +59,7 @@ export function CreatePinForm({ onSubmit, loading, error }: CreatePinFormProps) 
       <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
         <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
         <p className="text-amber-300/80 text-xs">
-          Ne partage jamais ton PIN. Tontigo ne te le demandera jamais.
+          Ne partage jamais ton PIN. Likelemba ne te le demandera jamais.
         </p>
       </div>
     </div>

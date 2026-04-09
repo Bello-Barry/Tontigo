@@ -57,8 +57,8 @@ export function CreateVaultForm() {
         <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-sm font-semibold text-orange-600">Règle Immuable Tontigo</h4>
-            <p className="text-xs text-orange-700 mt-1">Vous ne pourrez retirer aucun fond (même partiel) avant la date fixée ci-dessous. Même l'assistance Tontigo ne peut contourner cette règle. Minimum 30 jours.</p>
+            <h4 className="text-sm font-semibold text-orange-600">Règle Immuable Likelemba</h4>
+            <p className="text-xs text-orange-700 mt-1">Vous ne pourrez retirer aucun fond (même partiel) avant la date fixée ci-dessous. Même l'assistance Likelemba ne peut contourner cette règle. Minimum 30 jours.</p>
           </div>
         </div>
 

@@ -6,7 +6,7 @@
 
 > **INSTRUCTIONS POUR L'AGENT**
 > Tu es un ingénieur full-stack senior spécialisé Next.js/Supabase.
-> Construis l'intégralité de l'application Tontigo en suivant ce document **dans l'ordre exact**.
+> Construis l'intégralité de l'application Likelemba en suivant ce document **dans l'ordre exact**.
 > Chaque étape doit être complète avant de passer à la suivante.
 > Ne suppose rien. Chaque fichier, chaque fonction, chaque composant est spécifié ici.
 > Si une information manque dans une étape, relis les étapes précédentes — elle s'y trouve.
@@ -55,12 +55,12 @@
 
 ## 1. CONTEXTE & VISION PRODUIT
 
-**Tontigo** est une application web de tontine digitale destinée au Congo Brazzaville et à l'Afrique centrale.
+**Likelemba** est une application web de tontine digitale destinée au Congo Brazzaville et à l'Afrique centrale.
 
 ### Ce qu'est une tontine
 Un groupe de personnes cotise régulièrement une somme fixe. À chaque cycle, la totalité de la cagnotte est versée à un seul membre, selon un ordre défini. Le cycle se répète jusqu'à ce que chaque membre ait reçu sa cagnotte.
 
-### Les 3 modules de Tontigo
+### Les 3 modules de Likelemba
 
 **Module 1 — Tontine entre amis**
 Groupes privés par lien d'invitation. Les membres se connaissent.
@@ -302,7 +302,7 @@ AIRTEL_CURRENCY=XAF
 CRON_SECRET=genere_une_chaine_aleatoire_longue_ici
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-# ─── Tontigo Business Config ─────────────────────────────────
+# ─── Likelemba Business Config ─────────────────────────────────
 # Taux de commission sur chaque versement (1.5%)
 COMMISSION_PAYOUT_RATE=0.015
 # Frais fixes de matching par utilisateur en FCFA
@@ -687,7 +687,7 @@ CREATE TABLE public.payouts (
   recipient_id        UUID NOT NULL REFERENCES public.users(id),
   membership_id       UUID NOT NULL REFERENCES public.memberships(id),
   amount              NUMERIC(12,2) NOT NULL,   -- montant brut (cotisations × membres)
-  commission_amount   NUMERIC(12,2) DEFAULT 0,  -- 1.5% prélevé par Tontigo
+  commission_amount   NUMERIC(12,2) DEFAULT 0,  -- 1.5% prélevé par Likelemba
   net_amount          NUMERIC(12,2) NOT NULL,   -- montant reçu par le membre
   turn_number         INTEGER NOT NULL,
   status              payout_status DEFAULT 'en_attente',
@@ -784,7 +784,7 @@ CREATE TABLE public.transactions (
 );
 
 -- ============================================================
--- TABLE: platform_revenues (revenus Tontigo)
+-- TABLE: platform_revenues (revenus Likelemba)
 -- ============================================================
 CREATE TABLE public.platform_revenues (
   id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1719,7 +1719,7 @@ export async function sendOtp(phone: string): Promise<ActionResult> {
     .from('phone_blacklist').select('id').eq('phone', phone).maybeSingle()
 
   if (blacklisted) {
-    return { error: 'Ce numéro est banni de la plateforme Tontigo.' }
+    return { error: 'Ce numéro est banni de la plateforme Likelemba.' }
   }
 
   const supabase = await createServerSupabaseClient()
@@ -2072,7 +2072,7 @@ async function processPayout(groupId: string, turnNumber: number): Promise<void>
 
   if (!payout) return
 
-  // Enregistrer la commission Tontigo
+  // Enregistrer la commission Likelemba
   await recordRevenue({
     type:        'commission_payout',
     amount:      commission,
@@ -2221,7 +2221,7 @@ interface RecordRevenueInput {
   description?: string
 }
 
-// Enregistrer un revenu pour Tontigo (appelé en interne, jamais exposé côté client)
+// Enregistrer un revenu pour Likelemba (appelé en interne, jamais exposé côté client)
 export async function recordRevenue(input: RecordRevenueInput): Promise<void> {
   await serviceClient.from('platform_revenues').insert({
     type:         input.type,
@@ -2245,7 +2245,7 @@ export async function chargeMatchingFee(userId: string, requestId: string): Prom
     reference_id:       requestId,
     type:               'matching_fee',
     amount:             FEE,
-    description:        'Frais de mise en relation Tontigo',
+    description:        'Frais de mise en relation Likelemba',
     external_reference: ref,
   })
 
@@ -2280,7 +2280,7 @@ export async function activateProSubscription(userId: string, walletType: 'mtn' 
     user_id:            userId,
     type:               'abonnement',
     amount:             PRICE,
-    description:        'Abonnement Tontigo Pro — 1 mois',
+    description:        'Abonnement Likelemba Pro — 1 mois',
     wallet_used:        walletType,
     external_reference: ref,
   })
@@ -2646,7 +2646,7 @@ export async function initiateMtnCollection(params: {
           externalId:  params.reference,
           payer:       { partyIdType: 'MSISDN', partyId: params.phone.replace('+', '') },
           payerMessage: params.description,
-          payeeNote:   'Tontigo',
+          payeeNote:   'Likelemba',
         }),
       }
     )
@@ -2680,7 +2680,7 @@ export async function initiateMtnDisbursement(params: {
           externalId:  params.reference,
           payee:       { partyIdType: 'MSISDN', partyId: params.phone.replace('+', '') },
           payerMessage: params.description,
-          payeeNote:   'Tontigo — Cagnotte reçue',
+          payeeNote:   'Likelemba — Cagnotte reçue',
         }),
       }
     )
@@ -2969,7 +2969,7 @@ Formulaire avec :
 
 ### `components/shared/Sidebar.tsx`
 Navigation latérale avec :
-- Logo Tontigo
+- Logo Likelemba
 - Links: Dashboard, Tontines, Matching, Épargne, Transactions, Profil
 - En bas: Avatar utilisateur + score de confiance + bouton déconnexion
 - Actif: link surligné en vert emerald
@@ -3079,7 +3079,7 @@ Ligne transaction avec : icône type, description, montant coloré (vert entrant
 
 ### `app/(auth)/login/page.tsx`
 Page de connexion :
-- Logo Tontigo centré
+- Logo Likelemba centré
 - Titre "Connexion"
 - `PhoneForm` → si soumis, afficher `OtpForm`
 - Lien "Première connexion ? Pas besoin de créer un compte"
@@ -3087,7 +3087,7 @@ Page de connexion :
 
 ### `app/(auth)/onboarding/page.tsx`
 Page d'onboarding :
-- Titre "Bienvenue sur Tontigo 🇨🇬"
+- Titre "Bienvenue sur Likelemba 🇨🇬"
 - Sous-titre "Complète ton profil pour commencer"
 - `OnboardingForm`
 - Barre de progression étapes (1/1)
@@ -3505,5 +3505,5 @@ Ces règles ne peuvent jamais être violées :
 
 ---
 
-*🇨🇬 Tontigo — La tontine digitale de confiance au Congo Brazzaville*
+*🇨🇬 Likelemba — La tontine digitale de confiance au Congo Brazzaville*
 *Stack: Next.js 15 · TypeScript · Supabase · TailwindCSS · shadcn/ui · Zustand · Zod*

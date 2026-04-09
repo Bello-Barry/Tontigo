@@ -25,7 +25,7 @@ export async function initiateMtnCollection(params: {
           externalId:  params.reference,
           payer:       { partyIdType: 'MSISDN', partyId: params.phone.replace('+', '') },
           payerMessage: params.description,
-          payeeNote:   'Tontigo',
+          payeeNote:   'Likelemba',
         }),
       }
     )
@@ -59,7 +59,7 @@ export async function initiateMtnDisbursement(params: {
           externalId:  params.reference,
           payee:       { partyIdType: 'MSISDN', partyId: params.phone.replace('+', '') },
           payerMessage: params.description,
-          payeeNote:   'Tontigo — Cagnotte reçue',
+          payeeNote:   'Likelemba — Cagnotte reçue',
         }),
       }
     )

@@ -1,10 +1,10 @@
-# Guide de Maîtrise du Backend Tontigo 🚀
+# Guide de Maîtrise du Backend Likelemba 🚀
 
-Ce guide est conçu pour t'aider à comprendre et maîtriser l'architecture backend de ton application Tontigo. Il couvre la base de données, la logique métier et l'intégration des paiements mobiles (MTN & Airtel).
+Ce guide est conçu pour t'aider à comprendre et maîtriser l'architecture backend de ton application Likelemba. Il couvre la base de données, la logique métier et l'intégration des paiements mobiles (MTN & Airtel).
 
 ## 1. Architecture Globale
 
-Tontigo utilise une architecture **Fullstack Next.js** moderne :
+Likelemba utilise une architecture **Fullstack Next.js** moderne :
 - **Frontend :** React 19, Tailwind CSS, Shadcn UI.
 - **Backend :** Next.js **Server Actions** (`lib/actions/`).
 - **Base de données :** **Supabase** (PostgreSQL) avec Row Level Security (RLS).
@@ -33,7 +33,7 @@ Le schéma de la base de données se trouve dans `supabase/migrations/001_initia
 
 ## 3. Authentification Numéro + PIN
 
-Contrairement au web classique (Email/Mot de passe), Tontigo utilise un système adapté au marché local :
+Contrairement au web classique (Email/Mot de passe), Likelemba utilise un système adapté au marché local :
 - **Logique (`lib/actions/auth.actions.ts`)** : On génère un "faux" email à partir du numéro de téléphone (ex: `061234567@tontigo.fake`) pour utiliser le moteur d'auth de Supabase, tout en gardant une expérience simple pour l'utilisateur.
 - **PIN** : Le mot de passe de l'utilisateur est son code PIN à 4 chiffres.
 
@@ -71,7 +71,7 @@ Tout se passe dans `lib/actions/tontine.actions.ts`.
    - On augmente son score de confiance (+2 points).
 3. **Versement de la Cagnotte (`checkAndProcessPayout`)** :
    - Dès que la dernière cotisation du tour est payée, le système déclenche automatiquement le versement.
-   - On calcule la commission Tontigo (1.5%) via `calculatePayoutCommission`.
+   - On calcule la commission Likelemba (1.5%) via `calculatePayoutCommission`.
    - On enregistre le versement dans `payouts` et on envoie l'argent.
    - On passe au tour suivant (Incrémentation de `current_turn`).
 

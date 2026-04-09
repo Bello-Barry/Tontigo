@@ -55,7 +55,7 @@ export default async function TransactionsPage() {
 
       <div className="space-y-3">
         {txs.length === 0 ? (
-          <EmptyState title="Aucune transaction" description="Vous n'avez pas encore effectué de paiements sur Tontigo." />
+          <EmptyState title="Aucune transaction" description="Vous n'avez pas encore effectué de paiements sur Likelemba." />
         ) : (
           txs.map(tx => <TransactionRow key={tx.id} tx={tx} />)
         )}

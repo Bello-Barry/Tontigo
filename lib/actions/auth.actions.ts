@@ -25,7 +25,7 @@ export async function registerWithPin(
     .maybeSingle()
 
   if (blacklisted) {
-    return { error: 'Ce numéro est banni de la plateforme Tontigo.' }
+    return { error: 'Ce numéro est banni de la plateforme Likelemba.' }
   }
 
   // Vérifier si le numéro existe déjà
@@ -92,7 +92,7 @@ export async function loginWithPin(
 
   if (profile?.is_banned) {
     await supabase.auth.signOut()
-    return { error: 'Ce compte est banni de la plateforme Tontigo.' }
+    return { error: 'Ce compte est banni de la plateforme Likelemba.' }
   }
 
   // Rediriger vers onboarding si profil incomplet
