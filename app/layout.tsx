@@ -20,6 +20,11 @@ export const metadata: Metadata = {
   title: "Likelemba",
   description: "L'épargne et la tontine sécurisée au Congo",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
