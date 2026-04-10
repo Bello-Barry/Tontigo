@@ -49,3 +49,5 @@ https://supabase.com/dashboard/project/_/settings/api
 ⚠ Unsupported metadata themeColor is configured in metadata export in /_not-found. Please move it to viewport export instead.
 Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
 ✓ Compiled in 71ms
+✓ Compiled in 4.2s
+✓ Compiled in 148ms
