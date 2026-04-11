@@ -42,6 +42,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
 
           <div className="flex items-center gap-4 ml-auto">
+            <AICoach />
             <NotificationBell />
             <Link href="/profile">
               <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center overflow-hidden">
@@ -61,9 +62,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
             {children}
           </div>
         </div>
-        
-        {/* Agent IA: Coach Likelemba */}
-        <AICoach />
       </main>
 
       {/* Navigation Mobile */}

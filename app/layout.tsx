@@ -4,6 +4,8 @@ import "./globals.css";
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
+import Script from "next/script";
+
 import { ThemeProvider } from "@/components/shared/ThemeProvider"
 
 const geistSans = Geist({
@@ -55,17 +57,15 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                if ('serviceWorker' in navigator) {
-                  window.addEventListener('load', function() {
-                    navigator.serviceWorker.register('/sw.js');
-                  });
-                }
-              `,
-            }}
-          />
+          <Script id="sw-registration" strategy="afterInteractive">
+            {`
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js');
+                });
+              }
+            `}
+          </Script>
           <ToastContainer
             position="top-right"
             autoClose={4000}
