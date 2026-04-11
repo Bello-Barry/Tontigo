@@ -38,7 +38,7 @@ Règles :
       messages: coreMessages,
     })
 
-    return result.toTextStreamResponse()
+    return result.toUIMessageStreamResponse()
   } catch (error) {
     console.error("Erreur API Chat:", error)
     return Response.json({ error: 'Une erreur est survenue lors du traitement avec le Coach.' }, { status: 500 })
