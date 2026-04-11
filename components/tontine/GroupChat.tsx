@@ -134,14 +134,16 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl hover:scale-105 transition-transform z-50"
-          size="icon"
-        >
-          <MessageSquare className="w-6 h-6" />
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button
+            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl hover:scale-105 transition-transform z-50"
+            size="icon"
+          >
+            <MessageSquare className="w-6 h-6" />
+          </Button>
+        }
+      />
       
       <DialogContent className="max-w-none w-screen h-screen m-0 p-0 flex flex-col bg-slate-950 border-none rounded-none outline-none">
         <DialogHeader className="p-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0">

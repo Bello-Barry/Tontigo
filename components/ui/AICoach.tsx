@@ -190,20 +190,22 @@ export function AICoach() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative text-slate-400 hover:text-emerald-400 transition-colors"
-          aria-label="Coach Likelemba"
-        >
-          <Bot size={22} />
-          <span className="absolute -top-1 -right-1 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative text-slate-400 hover:text-emerald-400 transition-colors"
+            aria-label="Coach Likelemba"
+          >
+            <Bot size={22} />
+            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </Button>
+        }
+      />
 
       <DialogContent className="max-w-none w-screen h-screen m-0 p-0 flex flex-row bg-slate-950 border-none rounded-none outline-none overflow-hidden">
         {/* Sidebar - Conversation History */}
