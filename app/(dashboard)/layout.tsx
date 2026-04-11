@@ -7,6 +7,7 @@ import { TrustScoreBadge } from '@/components/shared/TrustScoreBadge'
 import { isProfileComplete } from '@/lib/utils/onboarding'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { AICoach } from '@/components/ui/AICoach'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient()
@@ -60,6 +61,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
             {children}
           </div>
         </div>
+        
+        {/* Agent IA: Coach Likelemba */}
+        <AICoach />
       </main>
 
       {/* Navigation Mobile */}

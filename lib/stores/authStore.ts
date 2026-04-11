@@ -27,6 +27,6 @@ export const useAuthStore = create<AuthStore>()(
         })),
       clearUser: () => set({ user: null }),
     }),
-    { name: 'tontigo-auth' }
+    { name: 'likelemba-auth' }
   )
 )

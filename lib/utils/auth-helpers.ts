@@ -3,22 +3,22 @@
  * L'utilisateur ne verra jamais cet email.
  *
  * Exemples :
- *   "0612345678"    → "242612345678@tontigo.app"
- *   "+242612345678" → "242612345678@tontigo.app"
+ *   "0612345678"    → "242612345678@likelemba.app"
+ *   "+242612345678" → "242612345678@likelemba.app"
  */
 export function phoneToFakeEmail(phone: string): string {
   const digits = phone.replace(/\D/g, '')
   const normalized = digits.startsWith('242')
     ? digits
     : `242${digits.startsWith('0') ? digits.slice(1) : digits}`
-  return `${normalized}@tontigo.app`
+  return `${normalized}@likelemba.app`
 }
 
 /**
  * Extrait le numéro lisible depuis un email fictif.
  */
 export function fakeEmailToPhone(email: string): string {
-  const digits = email.replace('@tontigo.app', '')
+  const digits = email.replace('@likelemba.app', '')
   return `+${digits}`
 }
 

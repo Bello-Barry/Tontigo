@@ -13,6 +13,7 @@ import { GroupStatusBadge } from '@/components/tontine/GroupStatusBadge'
 import { StartGroupButton } from '@/components/tontine/StartGroupButton'
 import { CopyInviteCode } from '@/components/tontine/CopyInviteCode'
 import { formatFCFA, getFrequencyLabel } from '@/lib/utils/format'
+import { GroupChat } from '@/components/tontine/GroupChat'
 
 interface Props {
   params: { id: string }
@@ -245,6 +246,13 @@ export default async function GroupDetailPage(props: Props) {
           </div>
         </section>
       )}
+
+      {/* Floating Chat */}
+      <GroupChat 
+        groupId={group.id} 
+        currentUserId={user.id} 
+        members={memberships || []} 
+      />
     </div>
   )
 }

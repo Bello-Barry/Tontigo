@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_ROUTES = ['/login', '/register', '/onboarding']
+const PUBLIC_ROUTES = ['/', '/login', '/register', '/onboarding', '/features', '/how-it-works', '/about', '/mentions-legales', '/confidentialite']
 const AUTH_ROUTES   = ['/login', '/register']
 
 export async function middleware(request: NextRequest) {
@@ -52,5 +52,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.json|icon-.*\\.png|logo\\.png|offline|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
