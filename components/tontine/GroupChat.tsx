@@ -76,10 +76,32 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
         schema: 'public', 
         table: 'group_messages',
         filter: `group_id=eq.${groupId}`
-      }, (payload: any) => {
+      }, async (payload: any) => {
         const newMessage = payload.new as Message
+
+        // Fetch user details for the new message if not present
+        if (!newMessage.user) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('full_name, avatar_url')
+            .eq('id', newMessage.user_id)
+            .single()
+
+          if (userData) {
+            newMessage.user = userData
+          }
+        }
+
         setMessages((prev) => [...prev, newMessage])
         setTimeout(scrollToBottom, 100)
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'group_messages',
+        filter: `group_id=eq.${groupId}`
+      }, (payload: any) => {
+        setMessages((prev) => prev.filter(m => m.id !== payload.old.id))
       })
       .subscribe()
 
@@ -145,8 +167,8 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
         }
       />
       
-      <DialogContent className="max-w-none w-screen h-screen m-0 p-0 flex flex-col bg-slate-950 border-none rounded-none outline-none">
-        <DialogHeader className="p-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0">
+      <DialogContent className="max-w-none w-screen h-[100dvh] m-0 p-0 flex flex-col bg-slate-950 border-none rounded-none outline-none fixed inset-0 translate-x-0 translate-y-0">
+        <DialogHeader className="p-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0 h-16">
           <DialogTitle className="flex items-center gap-2 text-white">
             <MessageSquare className="w-5 h-5 text-primary" />
             Chat du Groupe

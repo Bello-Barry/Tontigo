@@ -20,7 +20,7 @@ export function AICoach() {
   const [chatInput, setChatInput] = useState('')
   const [conversations, setConversations] = useState<any[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
 
   const supabase = createClient()
@@ -135,6 +135,20 @@ export function AICoach() {
     }
   }
 
+  const clearAllHistory = async () => {
+    if (!userId || !confirm('Supprimer tout l\'historique ?')) return
+    const { error } = await supabase
+      .from('ai_conversations')
+      .delete()
+      .eq('user_id', userId)
+
+    if (!error) {
+      setConversations([])
+      setActiveConversationId(null)
+      setMessages([])
+    }
+  }
+
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!chatInput.trim() || isLoading || !userId) return
@@ -212,10 +226,10 @@ export function AICoach() {
         }
       />
 
-      <DialogContent className="max-w-none w-screen h-screen m-0 p-0 flex flex-row bg-slate-950 border-none rounded-none outline-none overflow-hidden">
+      <DialogContent className="max-w-none w-screen h-[100dvh] m-0 p-0 flex flex-row bg-slate-950 border-none rounded-none outline-none overflow-hidden fixed inset-0 translate-x-0 translate-y-0">
         {/* Sidebar - Conversation History */}
         {isSidebarOpen && (
-          <div className="w-80 h-full border-r border-slate-800 bg-slate-900 flex flex-col shrink-0">
+          <div className="w-72 sm:w-80 h-full border-r border-slate-800 bg-slate-900 flex flex-col shrink-0 z-20">
             <div className="p-4 border-b border-slate-800">
               <Button
                 onClick={startNewConversation}
@@ -236,7 +250,8 @@ export function AICoach() {
                   Aucune conversation
                 </div>
               ) : (
-                conversations.map(conv => (
+                <>
+                {conversations.map(conv => (
                   <div
                     key={conv.id}
                     className={`group flex items-center gap-2 p-3 rounded-xl cursor-pointer transition-colors ${
@@ -256,15 +271,27 @@ export function AICoach() {
                       <Trash2 size={14} />
                     </button>
                   </div>
-                ))
+                ))}
+                <div className="p-2 pt-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllHistory}
+                    className="w-full text-slate-500 hover:text-red-400 hover:bg-red-400/10 text-xs gap-2"
+                  >
+                    <Trash2 size={14} />
+                    Tout effacer
+                  </Button>
+                </div>
+                </>
               )}
             </div>
           </div>
         )}
 
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col h-full bg-slate-950 relative">
-          <DialogHeader className="p-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0">
+        <div className="flex-1 flex flex-col h-full bg-slate-950 relative min-w-0">
+          <DialogHeader className="p-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0 h-16">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
