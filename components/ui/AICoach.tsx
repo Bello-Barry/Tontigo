@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Plus, X, MessageSquare, History, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { DefaultChatTransport } from 'ai'
 
 export function AICoach() {
   const [isOpen, setIsOpen] = useState(false)
@@ -27,17 +28,22 @@ export function AICoach() {
   const { 
     messages, 
     setMessages,
-    append,
+    sendMessage,
     status, 
     error 
   } = useChat({
-    api: '/api/chat',
-    onFinish: async (message) => {
+    transport: new DefaultChatTransport({ api: '/api/chat' }),
+    onFinish: async ({ message }) => {
       if (activeConversationId) {
+        const textContent = message.parts
+          .filter(part => part.type === 'text')
+          .map(part => (part as any).text)
+          .join('')
+
         await supabase.from('ai_messages').insert({
           conversation_id: activeConversationId,
           role: 'assistant',
-          content: message.content,
+          content: textContent,
         })
       }
     }
@@ -168,9 +174,8 @@ export function AICoach() {
       await supabase.from('ai_conversations').update({ updated_at: new Date().toISOString() }).eq('id', currentConvId)
 
       try {
-        await append({
-          role: 'user',
-          content: messageToSend,
+        await sendMessage({
+          text: messageToSend,
         })
       } catch (err) {
         console.error("Coach Likelemba Error:", err)
