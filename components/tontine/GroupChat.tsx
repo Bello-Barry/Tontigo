@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { Send, MessageSquare, Trash2, X, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -38,8 +39,14 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
   
   const supabase = createClient()
 
@@ -163,16 +170,16 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
     <>
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl hover:scale-105 transition-transform z-50 bg-emerald-600 hover:bg-emerald-500 text-white"
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl hover:scale-105 transition-transform z-[100] bg-emerald-600 hover:bg-emerald-500 text-white"
         size="icon"
       >
         <MessageSquare className="w-6 h-6" />
       </Button>
 
-      {isOpen && (
+      {isOpen && mounted && createPortal(
         <div
           className={cn(
-            "fixed z-50 flex flex-col bg-slate-950 border-none outline-none overflow-hidden shadow-2xl",
+            "fixed z-[100] flex flex-col bg-slate-950 border-none outline-none overflow-hidden shadow-2xl",
             // Mobile style
             "inset-0 top-0 left-0 w-full h-full rounded-none",
             // Desktop style
@@ -215,7 +222,7 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
                           <img src={sender.avatar_url} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-400">
-                            {sender.full_name[0].toUpperCase()}
+                            {(sender.full_name || 'M')[0].toUpperCase()}
                           </div>
                         )}
                       </div>
@@ -296,7 +303,8 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useChat } from '@ai-sdk/react'
 import {
   Send,
@@ -30,12 +31,18 @@ import { cn } from '@/lib/utils'
 
 export function AICoach() {
   const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [view, setView] = useState<'chat' | 'history'>('chat')
   const [conversations, setConversations] = useState<AIConversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [chatInput, setChatInput] = useState('')
   const [isInitializing, setIsInitializing] = useState(true)
+
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
 
   const supabase = createClient()
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -188,10 +195,10 @@ export function AICoach() {
         </span>
       </Button>
 
-      {isOpen && (
+      {isOpen && mounted && createPortal(
         <div
           className={cn(
-            "fixed z-50 flex flex-col bg-slate-950 border-none outline-none overflow-hidden shadow-2xl",
+            "fixed z-[100] flex flex-col bg-slate-950 border-none outline-none overflow-hidden shadow-2xl",
             "inset-0 top-0 left-0 w-full h-full rounded-none",
             "md:inset-auto md:bottom-4 md:right-4 md:left-auto md:top-auto md:w-[384px] md:h-[600px] md:rounded-2xl md:border md:border-slate-800"
           )}
@@ -390,7 +397,8 @@ export function AICoach() {
             </div>
           </div>
         )}
-      </div>
+      </div>,
+        document.body
       )}
     </>
   )
