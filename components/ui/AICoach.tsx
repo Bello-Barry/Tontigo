@@ -1,185 +1,162 @@
-'use client'
+"use client"
 
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useChat } from '@ai-sdk/react'
-import { Bot, Send, User, ChevronDown, Loader2, AlertCircle } from 'lucide-react'
+import { DefaultChatTransport } from 'ai'
+import {
+  Send,
+  Bot,
+  User,
+  History,
+  X,
+  Plus,
+  Trash2,
+  MessageSquare,
+  Loader2,
+  AlertCircle,
+  ChevronLeft
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogTrigger
 } from '@/components/ui/dialog'
-import { Plus, X, MessageSquare, History, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { DefaultChatTransport } from 'ai'
+import {
+  saveAIConversation,
+  getAIConversations,
+  loadAIConversation,
+  deleteAIConversation,
+  deleteAllAIConversations,
+  AIConversation,
+  AIMessage
+} from '@/lib/actions/ia.actions'
+import { toast } from 'react-toastify'
+import { cn } from '@/lib/utils'
 
 export function AICoach() {
   const [isOpen, setIsOpen] = useState(false)
-  const [chatInput, setChatInput] = useState('')
-  const [conversations, setConversations] = useState<any[]>([])
+  const [view, setView] = useState<'chat' | 'history'>('chat')
+  const [conversations, setConversations] = useState<AIConversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
+  const [chatInput, setChatInput] = useState('')
+  const [isInitializing, setIsInitializing] = useState(true)
 
   const supabase = createClient()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const { 
     messages, 
     setMessages,
-    sendMessage,
-    status, 
+    append,
+    isLoading,
     error 
   } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
-    onFinish: async ({ message }) => {
-      if (activeConversationId) {
-        const textContent = message.parts
-          .filter(part => part.type === 'text')
-          .map(part => (part as any).text)
-          .join('')
+    onFinish: async (message) => {
+      // Find the user message that triggered this
+      const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content || chatInput
 
-        await supabase.from('ai_messages').insert({
-          conversation_id: activeConversationId,
-          role: 'assistant',
-          content: textContent,
-        })
+      const result = await saveAIConversation(
+        activeConversationId,
+        lastUserMessage,
+        message.content,
+        [] // currentHistory is managed in DB
+      )
+
+      if (result.data?.conversationId && !activeConversationId) {
+        setActiveConversationId(result.data.conversationId)
+        loadHistory() // Refresh history list
       }
     }
   })
 
-  const isLoading = status === 'submitted' || status === 'streaming'
-  const endOfMessagesRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
-    if (endOfMessagesRef.current) {
-      endOfMessagesRef.current.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [messages])
-
-  // Fetch user and conversations
-  useEffect(() => {
-    const init = async () => {
+    const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUserId(user.id)
-        loadConversations(user.id)
-      }
+      setUserId(user?.id || null)
+      setIsInitializing(false)
     }
-    if (isOpen) init()
+    getUser()
+  }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      setView('chat')
+      loadHistory()
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
   }, [isOpen])
 
-  const loadConversations = async (uid: string) => {
-    const { data } = await supabase
-      .from('ai_conversations')
-      .select('*')
-      .eq('user_id', uid)
-      .order('updated_at', { ascending: false })
-    if (data) setConversations(data)
+  const loadHistory = async () => {
+    const result = await getAIConversations()
+    if (result.data) {
+      setConversations(result.data)
+    }
   }
 
-  const loadMessages = async (conversationId: string) => {
-    const { data } = await supabase
-      .from('ai_messages')
-      .select('*')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true })
-    if (data) {
-      setMessages(data.map(m => ({
-        id: m.id,
-        role: m.role,
-        content: m.content
-      })) as any)
-    }
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   useEffect(() => {
-    if (activeConversationId) {
-      loadMessages(activeConversationId)
-    } else {
-      setMessages([])
-    }
-  }, [activeConversationId])
-
-  const startNewConversation = async () => {
-    if (!userId) return
-    const { data, error } = await supabase
-      .from('ai_conversations')
-      .insert({
-        user_id: userId,
-        title: 'Nouvelle discussion'
-      })
-      .select()
-      .single()
-
-    if (data) {
-      setConversations([data, ...conversations])
-      setActiveConversationId(data.id)
-    }
-  }
-
-  const deleteConversation = async (id: string) => {
-    if (!confirm('Supprimer cette discussion ?')) return
-    const { error } = await supabase
-      .from('ai_conversations')
-      .delete()
-      .eq('id', id)
-
-    if (!error) {
-      setConversations(conversations.filter(c => c.id !== id))
-      if (activeConversationId === id) {
-        setActiveConversationId(null)
-        setMessages([])
-      }
-    }
-  }
+    scrollToBottom()
+  }, [messages])
 
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!chatInput.trim() || isLoading || !userId) return
+    if (!chatInput.trim() || isLoading) return
 
-    const messageToSend = chatInput
+    const message = chatInput
     setChatInput('')
     
-    let currentConvId = activeConversationId
+    append({
+      role: 'user',
+      content: message
+    })
+  }
 
-    if (!currentConvId) {
-      // Auto-create conversation if none active
-      const { data } = await supabase
-        .from('ai_conversations')
-        .insert({
-          user_id: userId,
-          title: messageToSend.substring(0, 30) + (messageToSend.length > 30 ? '...' : '')
-        })
-        .select()
-        .single()
+  const startNewConversation = () => {
+    setActiveConversationId(null)
+    setMessages([])
+    setView('chat')
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
 
-      if (data) {
-        currentConvId = data.id
-        setActiveConversationId(data.id)
-        setConversations([data, ...conversations])
+  const selectConversation = async (id: string) => {
+    const result = await loadAIConversation(id)
+    if (result.data) {
+      setMessages(result.data.messages.map((m, i) => ({ ...m, id: i.toString() })) as any)
+      setActiveConversationId(id)
+      setView('chat')
+    } else {
+      toast.error(result.error || 'Erreur chargement conversation')
+    }
+  }
+
+  const handleDeleteConversation = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!confirm('Supprimer cette conversation ?')) return
+    const result = await deleteAIConversation(id)
+    if (result.success) {
+      setConversations(prev => prev.filter(c => c.id !== id))
+      if (activeConversationId === id) {
+        startNewConversation()
       }
     }
+  }
 
-    if (currentConvId) {
-      // Save user message
-      await supabase.from('ai_messages').insert({
-        conversation_id: currentConvId,
-        role: 'user',
-        content: messageToSend,
-      })
-
-      // Update conversation timestamp
-      await supabase.from('ai_conversations').update({ updated_at: new Date().toISOString() }).eq('id', currentConvId)
-
-      try {
-        await sendMessage({
-          text: messageToSend,
-        })
-      } catch (err) {
-        console.error("Coach Likelemba Error:", err)
-      }
+  const handleDeleteAll = async () => {
+    if (!confirm('Tout supprimer ?')) return
+    const result = await deleteAllAIConversations()
+    if (result.success) {
+      setConversations([])
+      startNewConversation()
     }
   }
 
@@ -195,31 +172,167 @@ export function AICoach() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-slate-400 hover:text-emerald-400 transition-colors"
-            aria-label="Coach Likelemba"
-          >
-            <Bot size={22} />
-            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-          </Button>
-        }
-      />
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative text-slate-400 hover:text-emerald-400 transition-colors"
+          aria-label="Coach Likelemba"
+        >
+          <Bot size={22} />
+          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+        </Button>
+      </DialogTrigger>
 
-      <DialogContent className="max-w-none w-screen h-screen m-0 p-0 flex flex-row bg-slate-950 border-none rounded-none outline-none overflow-hidden">
-        {/* Sidebar - Conversation History */}
-        {isSidebarOpen && (
-          <div className="w-80 h-full border-r border-slate-800 bg-slate-900 flex flex-col shrink-0">
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          "fixed z-50 flex flex-col bg-slate-950 border-none outline-none overflow-hidden shadow-2xl",
+          "inset-0 top-0 left-0 w-full h-full max-w-none translate-x-0 translate-y-0 rounded-none",
+          "md:inset-auto md:bottom-4 md:right-4 md:left-auto md:top-auto md:w-[384px] md:h-[600px] md:rounded-2xl md:-translate-x-0 md:-translate-y-0"
+        )}
+      >
+        <DialogHeader className="p-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0 h-16">
+          <div className="flex items-center gap-3">
+            {view === 'history' ? (
+              <Button variant="ghost" size="icon" onClick={() => setView('chat')} className="text-slate-400">
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" onClick={() => setView('history')} className="text-slate-400">
+                <History className="w-5 h-5" />
+              </Button>
+            )}
+            <DialogTitle className="flex flex-col gap-0.5">
+              <span className="flex items-center gap-2 text-white text-sm font-semibold">
+                <Bot className="w-4 h-4 text-emerald-500" />
+                {view === 'history' ? 'Historique' : 'Coach Likelemba'}
+              </span>
+              <span className="text-[10px] text-slate-500 font-medium">Assistant financier</span>
+            </DialogTitle>
+          </div>
+          <div className="flex items-center gap-1">
+            {view === 'history' && conversations.length > 0 && (
+              <Button variant="ghost" size="icon" onClick={handleDeleteAll} className="text-slate-500 hover:text-red-400">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </DialogHeader>
+
+        {view === 'chat' ? (
+          <>
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0 scrollbar-hide">
+              {messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-50">
+                  <Bot size={48} className="text-emerald-500" />
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-medium text-white">Comment puis-je vous aider ?</h3>
+                    <p className="max-w-xs text-xs text-slate-400 mx-auto">
+                      Posez-moi vos questions sur l'épargne collaborative, les tontines ou vos finances.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[10px] bg-slate-900 border-slate-800"
+                      onClick={() => { setChatInput("Comment marche une tontine ?"); inputRef.current?.focus(); }}
+                    >
+                      Comment ça marche ?
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[10px] bg-slate-900 border-slate-800"
+                      onClick={() => { setChatInput("Conseils pour épargner"); inputRef.current?.focus(); }}
+                    >
+                      Conseils d'épargne
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={cn("flex gap-3 max-w-[90%]", m.role === 'user' ? 'ml-auto flex-row-reverse' : 'flex-row')}
+                >
+                  <div className={cn(
+                    "shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm",
+                    m.role === 'user' ? "bg-emerald-600 text-white" : "bg-slate-800 text-emerald-400 border border-slate-700"
+                  )}>
+                    {m.role === 'user' ? <User size={14} /> : <Bot size={14} />}
+                  </div>
+                  <div className={cn(
+                    "p-3 rounded-2xl text-sm leading-relaxed shadow-sm",
+                    m.role === 'user'
+                      ? "bg-emerald-600/10 text-emerald-50 border border-emerald-600/20 rounded-tr-none"
+                      : "bg-slate-900 text-slate-200 border border-slate-800 rounded-tl-none"
+                  )}>
+                    {renderMessageContent(m)}
+                  </div>
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="flex gap-3">
+                  <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm">
+                    <Bot size={14} />
+                  </div>
+                  <div className="p-3 rounded-2xl rounded-tl-none bg-slate-900 border border-slate-800 flex items-center gap-2 shadow-sm">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                    <span className="text-[10px] text-slate-500 font-medium">Réflexion...</span>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="flex items-center gap-2 p-3 text-xs text-red-400 bg-red-900/10 border border-red-900/20 rounded-xl">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <p>Une erreur est survenue. Vérifiez votre connexion.</p>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} className="h-4" />
+            </div>
+
+            <div className="p-4 border-t border-slate-800 bg-slate-900 shrink-0">
+              <form onSubmit={handleCustomSubmit} className="flex items-center gap-2">
+                <input
+                  ref={inputRef}
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Posez votre question..."
+                  className="flex-1 bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all outline-none"
+                  disabled={isLoading}
+                />
+                <Button
+                  type="submit"
+                  disabled={isLoading || !chatInput.trim()}
+                  size="icon"
+                  className="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 w-10 transition-all shadow-lg shadow-emerald-900/20 active:scale-95"
+                >
+                  <Send size={18} />
+                </Button>
+              </form>
+              <p className="text-[9px] text-center text-slate-500 mt-3 font-medium opacity-50 uppercase tracking-tighter">
+                 Propulsé par Likelemba Intelligence
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
             <div className="p-4 border-b border-slate-800">
               <Button
                 onClick={startNewConversation}
-                className="w-full justify-start gap-2 bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 hover:bg-emerald-600 hover:text-white"
+                className="w-full justify-start gap-2 bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 hover:bg-emerald-600 hover:text-white transition-all rounded-xl"
                 variant="outline"
               >
                 <Plus size={18} />
@@ -227,31 +340,41 @@ export function AICoach() {
               </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Historique
-              </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide">
               {conversations.length === 0 ? (
-                <div className="p-4 text-sm text-slate-500 text-center italic">
-                  Aucune conversation
+                <div className="flex flex-col items-center justify-center h-full text-center space-y-3 opacity-30">
+                  <MessageSquare size={32} />
+                  <p className="text-xs">Aucun historique disponible</p>
                 </div>
               ) : (
                 conversations.map(conv => (
                   <div
                     key={conv.id}
-                    className={`group flex items-center gap-2 p-3 rounded-xl cursor-pointer transition-colors ${
-                      activeConversationId === conv.id ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800/50'
-                    }`}
-                    onClick={() => setActiveConversationId(conv.id)}
+                    className={cn(
+                      "group flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border",
+                      activeConversationId === conv.id
+                        ? "bg-slate-800 border-slate-700 text-white shadow-md"
+                        : "bg-slate-900/50 border-transparent text-slate-400 hover:bg-slate-800 hover:border-slate-700"
+                    )}
+                    onClick={() => selectConversation(conv.id)}
                   >
-                    <MessageSquare size={16} />
-                    <span className="flex-1 truncate text-sm">{conv.title}</span>
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                      activeConversationId === conv.id ? "bg-emerald-600" : "bg-slate-800"
+                    )}>
+                      <MessageSquare size={16} className={activeConversationId === conv.id ? "text-white" : "text-slate-500"} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{conv.title}</div>
+                      <div className="text-[10px] text-slate-500">
+                        {new Date(conv.updated_at).toLocaleDateString('fr-FR', {
+                          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteConversation(conv.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"
+                      onClick={(e) => handleDeleteConversation(e, conv.id)}
+                      className="opacity-0 group-hover:opacity-100 p-2 text-slate-500 hover:text-red-400 transition-all rounded-lg hover:bg-red-400/10"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -259,110 +382,12 @@ export function AICoach() {
                 ))
               )}
             </div>
+
+            <div className="p-6 text-center opacity-20">
+              <Bot size={24} className="mx-auto" />
+            </div>
           </div>
         )}
-
-        {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col h-full bg-slate-950 relative">
-          <DialogHeader className="p-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="text-slate-400 hover:text-white"
-              >
-                <History className="w-5 h-5" />
-              </Button>
-              <DialogTitle className="flex items-center gap-2 text-white">
-                <Bot className="w-5 h-5 text-emerald-500" />
-                Coach Likelemba
-              </DialogTitle>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </Button>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-6 max-w-4xl mx-auto w-full">
-            {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-50">
-                <Bot size={48} className="text-emerald-500" />
-                <h3 className="text-xl font-medium text-white">Comment puis-je vous aider aujourd'hui ?</h3>
-                <p className="max-w-md text-slate-400">
-                  Je suis votre assistant financier expert en Tontines et Likelemba. Posez-moi n'importe quelle question.
-                </p>
-              </div>
-            )}
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex gap-3 max-w-[90%] ${m.role === 'user' ? 'ml-auto flex-row-reverse' : 'flex-row'}`}
-            >
-              <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                m.role === 'user' 
-                  ? 'bg-emerald-600 text-white' 
-                  : 'bg-slate-800 text-emerald-400'
-              }`}>
-                {m.role === 'user' ? <User size={16} /> : <Bot size={16} />}
-              </div>
-              <div
-                className={`p-3 rounded-2xl whitespace-pre-wrap text-sm leading-relaxed ${
-                  m.role === 'user'
-                    ? 'bg-emerald-600/10 text-emerald-50 border border-emerald-600/20 rounded-tr-none'
-                    : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-tl-none'
-                }`}
-              >
-                {renderMessageContent(m)}
-              </div>
-            </div>
-          ))}
-          
-          {isLoading && (
-            <div className="flex gap-3 max-w-[85%]">
-              <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-slate-800 text-emerald-400">
-                <Bot size={16} />
-              </div>
-              <div className="p-4 rounded-2xl rounded-tl-none bg-slate-900 border border-slate-800 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
-                <span className="text-xs text-slate-500 font-medium">Réflexion...</span>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="flex items-center gap-2 p-3 text-xs text-red-400 bg-red-900/10 border border-red-900/20 rounded-xl mx-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <p>Une erreur est survenue (API). Vérifiez votre connexion.</p>
-            </div>
-          )}
-          
-          <div ref={endOfMessagesRef} />
-        </div>
-
-          <div className="p-4 border-t border-slate-800 bg-slate-900 mt-auto shrink-0">
-            <form onSubmit={handleCustomSubmit} className="max-w-4xl mx-auto flex items-center gap-2">
-            <input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Écrivez votre question..."
-              className="flex-1 bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none"
-              disabled={isLoading}
-            />
-            <Button
-              type="submit"
-              disabled={isLoading || !chatInput.trim()}
-              size="icon"
-              className="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 w-10 transition-colors shadow-lg shadow-emerald-900/20"
-            >
-              <Send size={18} />
-            </Button>
-          </form>
-          <p className="text-[10px] text-center text-slate-500 mt-3 font-medium opacity-50">
-             Coach Likelemba • IA Prédictive
-          </p>
-        </div>
-        </div>
       </DialogContent>
     </Dialog>
   )
