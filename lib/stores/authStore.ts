@@ -5,6 +5,7 @@ import type { UserProfile } from '@/lib/types'
 interface AuthStore {
   user: UserProfile | null
   setUser: (user: UserProfile | null) => void
+  updateAvatar: (url: string) => void
   updateTrustScore: (score: number) => void
   updateSubscription: (plan: 'free' | 'pro', expiresAt: string | null) => void
   clearUser: () => void
@@ -15,6 +16,10 @@ export const useAuthStore = create<AuthStore>()(
     (set) => ({
       user: null,
       setUser: (user) => set({ user }),
+      updateAvatar: (url: string) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, avatar_url: url } : null,
+        })),
       updateTrustScore: (score) =>
         set((state) => ({
           user: state.user ? { ...state.user, trust_score: score } : null,

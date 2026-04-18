@@ -7,9 +7,11 @@ import { toast } from 'react-toastify'
 
 interface AudioRecorderProps {
   groupId: string
+  onOptimisticMessage?: (message: any) => void
+  onReplaceOptimistic?: (tempId: string, realMessage: any) => void
 }
 
-export function AudioRecorder({ groupId }: AudioRecorderProps) {
+export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimistic }: AudioRecorderProps) {
   const [recording, setRecording]     = useState(false)
   const [audioBlob, setAudioBlob]     = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl]       = useState<string | null>(null)
@@ -107,8 +109,23 @@ export function AudioRecorder({ groupId }: AudioRecorderProps) {
   }
 
   const sendAudio = async () => {
-    if (!audioBlob) return
+    if (!audioBlob || !audioUrl) return
     setSending(true)
+
+    const tempId = `temp-audio-${Date.now()}`
+
+    // OPTIMISTIC UPDATE
+    if (onOptimisticMessage) {
+      onOptimisticMessage({
+        id: tempId,
+        message_type: 'audio',
+        audio_url: audioUrl, // local preview
+        audio_duration_seconds: duration,
+        created_at: new Date().toISOString(),
+        is_deleted: false,
+        content: '[Audio message]'
+      })
+    }
 
     try {
       const supabase = createClient()
@@ -134,6 +151,10 @@ export function AudioRecorder({ groupId }: AudioRecorderProps) {
       if (result.error) {
         toast.error(result.error)
         return
+      }
+
+      if (onReplaceOptimistic && result.data) {
+        onReplaceOptimistic(tempId, result.data)
       }
 
       cancelAudio()

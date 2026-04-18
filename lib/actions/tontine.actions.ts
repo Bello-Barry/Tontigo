@@ -1,62 +1,67 @@
 'use server'
-import { analyzeFugitiveBehavior } from "@/lib/ai/modules/behavioral-analysis"
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
 import { revalidatePath } from 'next/cache'
 import { calculateGuarantee } from '@/lib/utils/guarantee'
-import { recordRevenue } from './commission.actions'
 import { calculatePayoutCommission } from '@/lib/utils/commission'
-import type { ActionResult, TontineGroup } from '@/lib/types'
-import type { CreateGroupInput } from '@/lib/validations/tontine.schema'
+import { recordRevenue } from './commission.actions'
+import { creditWalletFromPayout } from './wallet.actions'
+import type { ActionResult } from '@/lib/types'
 
-export async function createGroup(input: CreateGroupInput): Promise<ActionResult<TontineGroup>> {
+// CRÉER UN GROUPE
+export async function createGroup(data: any): Promise<ActionResult<{ id: string }>> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
+  const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+
   const { data: group, error } = await serviceClient
     .from('tontine_groups')
-    .insert({ ...input, creator_id: user.id, current_members: 1 })
+    .insert({
+      ...data,
+      creator_id: user.id,
+      invite_code: inviteCode,
+      current_members: 1,
+      status: 'en_attente',
+    })
     .select()
     .single()
 
   if (error) return { error: error.message }
 
-  // Initialiser le pool de solidarité
+  // Créer le membership du créateur
+  await serviceClient.from('memberships').insert({
+    group_id: group.id,
+    user_id: user.id,
+    turn_position: 1,
+    status: 'actif',
+  })
+
+  // Créer le pool de solidarité
   await serviceClient.from('solidarity_pool').insert({
     group_id: group.id,
     balance: 0,
   })
 
-  // Ajouter le créateur comme membre position 1
-  const guarantee = input.requires_guarantee
-    ? calculateGuarantee(1, input.max_members, input.amount)
-    : 0
-
-  await serviceClient.from('memberships').insert({
-    group_id:         group.id,
-    user_id:          user.id,
-    turn_position:    1,
-    guarantee_amount: guarantee,
-  })
-
-  // Invalider le cache de la liste ET de la page du nouveau groupe
   revalidatePath('/tontine')
-  revalidatePath(`/tontine/${group.id}`)
-
-  return { data: group, success: true }
+  return { data: { id: group.id }, success: true }
 }
 
-export async function joinGroupByCode(invite_code: string): Promise<ActionResult<TontineGroup>> {
+// REJOINDRE UN GROUPE PAR CODE
+export async function joinGroupByCode(code: string): Promise<ActionResult<{ id: string }>> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  const { data: group } = await serviceClient
-    .from('tontine_groups').select('*').eq('invite_code', invite_code).single()
+  const { data: group, error: gError } = await serviceClient
+    .from('tontine_groups')
+    .select('*')
+    .eq('invite_code', code.toUpperCase())
+    .single()
 
-  if (!group)                                    return { error: 'Code d\'invitation invalide.' }
-  if (group.status !== 'en_attente')             return { error: 'Ce groupe a déjà démarré.' }
+  if (gError || !group) return { error: 'Code d\'invitation invalide.' }
+  if (group.status !== 'en_attente') return { error: 'Ce groupe a déjà démarré.' }
   if (group.current_members >= group.max_members) return { error: 'Groupe complet.' }
 
   const { data: profile } = await supabase.from('users').select('trust_score').eq('id', user.id).single()
@@ -103,9 +108,10 @@ export async function joinGroupByCode(invite_code: string): Promise<ActionResult
   }
 
   revalidatePath('/tontine')
-  return { data: group, success: true }
+  return { data: { id: group.id }, success: true }
 }
 
+// DÉMARRER UN GROUPE
 export async function startGroup(groupId: string): Promise<ActionResult> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -160,6 +166,7 @@ export async function startGroup(groupId: string): Promise<ActionResult> {
   return { success: true }
 }
 
+// PAYER UNE COTISATION
 export async function payContribution(
   contributionId: string,
   walletType: 'mtn' | 'airtel'
@@ -193,7 +200,7 @@ export async function payContribution(
   }).eq('id', contributionId)
 
   await serviceClient.from('memberships').update({
-    total_paid: membership.total_paid + contribution.amount,
+    total_paid: Number(membership.total_paid) + contribution.amount,
   }).eq('id', contribution.membership_id)
 
   // Alimenter le pool de solidarité (2%)
@@ -211,6 +218,7 @@ export async function payContribution(
     amount:             contribution.amount,
     wallet_used:        walletType,
     external_reference: paymentRef,
+    status:             'success'
   })
 
   // +2 points de confiance pour paiement à temps
@@ -290,11 +298,12 @@ async function processPayout(groupId: string, turnNumber: number): Promise<void>
     payout_received_at:  new Date().toISOString(),
   }).eq('id', membership.id)
 
-  // S1: Analyse comportementale (fugitif potentiel) après versement
-  analyzeFugitiveBehavior({
-    userId:       membership.user_id,
-    membershipId: membership.id,
-    groupId:      groupId,
+  // ── CRÉDITER LE PORTEFEUILLE VIRTUEL ──
+  await creditWalletFromPayout({
+    userId:    membership.user_id,
+    payoutId:  payout.id,
+    amount:    netAmount,
+    groupName: group.name,
   }).catch(console.error)
 
   await serviceClient.from('transactions').insert({
@@ -303,6 +312,7 @@ async function processPayout(groupId: string, turnNumber: number): Promise<void>
     type:         'versement',
     amount:       netAmount,
     description:  `Cagnotte reçue — ${group.name} (tour ${turnNumber})`,
+    status:       'success'
   })
 
   await serviceClient.rpc('update_trust_score', { p_user_id: membership.user_id, p_delta: 10 })
@@ -310,11 +320,14 @@ async function processPayout(groupId: string, turnNumber: number): Promise<void>
   const nextTurn = turnNumber + 1
   if (nextTurn > group.current_members) {
     await serviceClient.from('tontine_groups').update({ status: 'termine' }).eq('id', groupId)
+
+    // 5.1 Recalculer le Trust Score de tous les membres en fin de cycle (S5/Trust AI)
     const { data: allMembers } = await serviceClient
       .from('memberships').select('user_id').eq('group_id', groupId)
     if (allMembers) {
+      const { recalculateTrustScoreAI } = await import('@/lib/ai/modules/trust-score-ai')
       for (const m of allMembers) {
-        await serviceClient.rpc('update_trust_score', { p_user_id: m.user_id, p_delta: 10 })
+        recalculateTrustScoreAI(m.user_id).catch(console.error)
       }
     }
   } else {
@@ -342,7 +355,7 @@ async function processPayout(groupId: string, turnNumber: number): Promise<void>
   await serviceClient.from('notifications').insert({
     user_id:      membership.user_id,
     title:        '💰 Cagnotte reçue !',
-    body:         `Tu as reçu ${new Intl.NumberFormat('fr-FR').format(netAmount)} FCFA de "${group.name}".`,
+    body:         `Tu as reçu ${new Intl.NumberFormat('fr-FR').format(netAmount)} FCFA de "${group.name}". Elle est disponible dans ton portefeuille.`,
     type:         'payout_received',
     reference_id: groupId,
   })

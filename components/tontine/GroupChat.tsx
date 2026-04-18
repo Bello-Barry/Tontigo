@@ -316,7 +316,16 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
 
               {!newMessage.trim() && (
                 <div className="shrink-0">
-                  <AudioRecorder groupId={groupId} />
+                  <AudioRecorder
+                  groupId={groupId}
+                  onOptimisticMessage={(msg) => {
+                    setMessages(prev => [...prev, { ...msg, user: currentUserProfile } as any])
+                    setTimeout(() => scrollToBottom(), 50)
+                  }}
+                  onReplaceOptimistic={(tempId, realMsg) => {
+                    setMessages(prev => prev.map(m => m.id === tempId ? { ...realMsg, user: currentUserProfile } as any : m))
+                  }}
+                />
                 </div>
               )}
 

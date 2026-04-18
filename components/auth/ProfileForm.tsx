@@ -1,180 +1,159 @@
 'use client'
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { toast } from 'react-toastify'
+import { useState, useEffect } from 'react'
 import { updateProfile } from '@/lib/actions/auth.actions'
+import { useAuthStore } from '@/lib/stores/authStore'
 import { AvatarUpload } from './AvatarUpload'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
+import { toast } from 'react-toastify'
 import { Loader2, Save } from 'lucide-react'
-import { BRAZZAVILLE_QUARTIERS, PROFESSIONS } from '@/lib/utils/onboarding'
-import { useRouter } from 'next/navigation'
-
-const profileUpdateSchema = z.object({
-  full_name:     z.string().min(3).max(60),
-  quartier:      z.string().min(1),
-  profession:    z.string().min(1),
-  wallet_mtn:    z.string().optional().or(z.literal('')),
-  wallet_airtel: z.string().optional().or(z.literal('')),
-})
-
-type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>
 
 interface ProfileFormProps {
-  initialData: {
-    full_name: string
-    quartier: string
-    profession: string
-    wallet_mtn: string
-    wallet_airtel: string
-    avatar_url: string
-  }
   userId: string
+  initialData: {
+    full_name:     string
+    quartier:      string
+    profession:    string
+    wallet_mtn:    string
+    wallet_airtel: string
+    avatar_url:    string
+  }
 }
 
-export function ProfileForm({ initialData, userId }: ProfileFormProps) {
-  const [loading, setLoading] = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState(initialData.avatar_url ?? '')
-  const router = useRouter()
+export function ProfileForm({ userId, initialData }: ProfileFormProps) {
+  const { user, setUser } = useAuthStore()
 
-  const { register, handleSubmit, setValue, formState: { errors, isDirty } } = useForm<ProfileUpdateInput>({
-    resolver: zodResolver(profileUpdateSchema),
-    defaultValues: {
-      full_name:     initialData.full_name,
-      quartier:      initialData.quartier      ?? '',
-      profession:    initialData.profession    ?? '',
-      wallet_mtn:    initialData.wallet_mtn    ?? '',
-      wallet_airtel: initialData.wallet_airtel ?? '',
-    },
+  // Priorité : store Zustand > props (le store est mis à jour après upload)
+  const currentAvatarUrl = user?.avatar_url ?? initialData.avatar_url ?? ''
+
+  const [formData, setFormData] = useState({
+    full_name:     user?.full_name ?? initialData.full_name,
+    quartier:      user?.quartier ?? initialData.quartier,
+    profession:    user?.profession ?? initialData.profession,
+    wallet_mtn:    user?.wallet_mtn ?? initialData.wallet_mtn,
+    wallet_airtel: user?.wallet_airtel ?? initialData.wallet_airtel,
+    avatar_url:    currentAvatarUrl,
   })
 
-  const onSubmit = async (data: ProfileUpdateInput) => {
+  const [loading, setLoading] = useState(false)
+
+  // Sync si le store change (ex: upload depuis un autre onglet)
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        avatar_url: user.avatar_url ?? prev.avatar_url,
+        full_name: user.full_name ?? prev.full_name,
+      }))
+    }
+  }, [user])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setLoading(true)
-    try {
-      const result = await updateProfile(userId, {
-        ...data,
-        avatar_url: avatarUrl || undefined,
-      })
-      if (result.error) {
-        toast.error(result.error)
-        return
+
+    const result = await updateProfile(userId, formData)
+    setLoading(false)
+
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success('Profil mis à jour !')
+      if (user) {
+        setUser({ ...user, ...formData })
       }
-      toast.success('✅ Profil mis à jour !')
-      router.refresh() // Rafraîchir pour afficher les nouvelles données
-    } catch {
-      toast.error('Erreur lors de la mise à jour.')
-    } finally {
-      setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      <div className="glass-card p-5 space-y-5">
-        <p className="text-slate-300 font-medium">Modifier mon profil</p>
-
-        {/* Avatar */}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="glass-card p-4 sm:p-6 space-y-6">
         <div className="flex justify-center">
-          <AvatarUpload userId={userId} onUpload={setAvatarUrl} initialAvatar={avatarUrl} />
-        </div>
-
-        {/* Nom */}
-        <div className="space-y-2">
-          <Label className="text-slate-300">Nom complet</Label>
-          <Input
-            className="bg-slate-700 border-slate-600 text-white h-12"
-            {...register('full_name')}
+          <AvatarUpload
+            userId={userId}
+            initialUrl={formData.avatar_url}
+            onUpload={(url) => setFormData(prev => ({ ...prev, avatar_url: url }))}
           />
-          {errors.full_name && <p className="text-red-400 text-sm">{errors.full_name.message}</p>}
         </div>
 
-        {/* Quartier */}
-        <div className="space-y-2">
-          <Label className="text-slate-300">Quartier</Label>
-          <Select
-            defaultValue={(initialData.quartier as string) || ''}
-            onValueChange={val => setValue('quartier', val || '', { shouldDirty: true })}
-          >
-            <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-12">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
-              {BRAZZAVILLE_QUARTIERS.map(q => (
-                <SelectItem key={q} value={q} className="text-white">{q}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Profession */}
-        <div className="space-y-2">
-          <Label className="text-slate-300">Profession</Label>
-          <Select
-            defaultValue={(initialData.profession as string) || ''}
-            onValueChange={val => setValue('profession', val || '', { shouldDirty: true })}
-          >
-            <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-12">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
-              {PROFESSIONS.map(p => (
-                <SelectItem key={p} value={p} className="text-white">{p}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Wallet MTN */}
-        <div className="space-y-2">
-          <Label className="text-slate-300 flex items-center gap-2">
-            <span className="w-4 h-4 bg-yellow-400 rounded-full text-[9px] flex items-center justify-center text-black font-bold">M</span>
-            MTN Money
-          </Label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">+242</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="full_name" className="text-slate-300">Nom complet</Label>
             <Input
-              type="tel"
-              className="pl-14 bg-slate-700 border-slate-600 text-white h-12"
-              {...register('wallet_mtn')}
+              id="full_name"
+              value={formData.full_name}
+              onChange={handleChange}
+              className="bg-slate-800 border-slate-700 text-white"
             />
           </div>
-          {errors.wallet_mtn && <p className="text-red-400 text-sm">{errors.wallet_mtn.message}</p>}
-        </div>
-
-        {/* Wallet Airtel */}
-        <div className="space-y-2">
-          <Label className="text-slate-300 flex items-center gap-2">
-            <span className="w-4 h-4 bg-red-500 rounded-full text-[9px] flex items-center justify-center text-white font-bold">A</span>
-            Airtel Money
-          </Label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">+242</span>
+          <div className="space-y-2">
+            <Label htmlFor="profession" className="text-slate-300">Profession</Label>
             <Input
-              type="tel"
-              className="pl-14 bg-slate-700 border-slate-600 text-white h-12"
-              {...register('wallet_airtel')}
+              id="profession"
+              value={formData.profession}
+              onChange={handleChange}
+              className="bg-slate-800 border-slate-700 text-white"
             />
           </div>
-          {errors.wallet_airtel && <p className="text-red-400 text-sm">{errors.wallet_airtel.message}</p>}
+          <div className="space-y-2">
+            <Label htmlFor="quartier" className="text-slate-300">Quartier</Label>
+            <Input
+              id="quartier"
+              value={formData.quartier}
+              onChange={handleChange}
+              className="bg-slate-800 border-slate-700 text-white"
+            />
+          </div>
         </div>
+
+        <div className="space-y-4 pt-4 border-t border-slate-700">
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+            Numéros Mobile Money
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="wallet_mtn" className="text-slate-300">MTN MoMo</Label>
+              <Input
+                id="wallet_mtn"
+                placeholder="06 xxx xx xx"
+                value={formData.wallet_mtn}
+                onChange={handleChange}
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="wallet_airtel" className="text-slate-300">Airtel Money</Label>
+              <Input
+                id="wallet_airtel"
+                placeholder="05 xxx xx xx"
+                value={formData.wallet_airtel}
+                onChange={handleChange}
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-12"
+        >
+          {loading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <>
+              <Save className="w-5 h-5 mr-2" />
+              Enregistrer les modifications
+            </>
+          )}
+        </Button>
       </div>
-
-      <Button
-        type="submit"
-        disabled={loading || !isDirty}
-        className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold gap-2 disabled:opacity-40"
-      >
-        {loading
-          ? <><Loader2 className="w-4 h-4 animate-spin" /> Sauvegarde...</>
-          : <><Save className="w-4 h-4" /> Sauvegarder</>
-        }
-      </Button>
     </form>
   )
 }

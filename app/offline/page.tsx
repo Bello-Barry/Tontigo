@@ -1,20 +1,24 @@
-import Link from 'next/link'
 import { WifiOff } from 'lucide-react'
+import Link from 'next/link'
 
 export default function OfflinePage() {
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
-      <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6">
-        <WifiOff className="w-10 h-10 text-slate-400" />
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center space-y-6 bg-slate-950">
+      <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center">
+        <WifiOff className="w-10 h-10 text-slate-500" />
       </div>
-      <h1 className="text-2xl font-bold text-white mb-2">Vous êtes hors ligne</h1>
-      <p className="text-slate-400 max-w-xs mb-8">
-        Certaines fonctionnalités de Likelemba nécessitent une connexion internet.
-        Vos données seront synchronisées dès que vous serez de retour.
-      </p>
+
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold text-white">Tu es hors ligne</h1>
+        <p className="text-slate-400 max-w-xs mx-auto">
+          Il semblerait que tu n'aies pas de connexion internet.
+          Vérifie ton réseau pour continuer à utiliser Likelemba.
+        </p>
+      </div>
+
       <Link
-        href="/"
-        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-lg transition-colors"
+        href="/dashboard"
+        className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-500 transition-colors"
       >
         Réessayer
       </Link>

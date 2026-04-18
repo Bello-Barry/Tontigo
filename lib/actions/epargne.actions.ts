@@ -4,6 +4,7 @@ import { serviceClient } from '@/lib/supabase/service'
 import { revalidatePath } from 'next/cache'
 import { recordRevenue } from './commission.actions'
 import { calculateSavingsCommission } from '@/lib/utils/commission'
+import { creditWalletFromVault } from './wallet.actions'
 import type { ActionResult, SavingsVault } from '@/lib/types'
 import type { CreateVaultInput, DepositVaultInput } from '@/lib/validations/epargne.schema'
 
@@ -51,7 +52,7 @@ export async function depositToVault(
   })
 
   await serviceClient.from('savings_vaults').update({
-    current_balance: vault.current_balance + input.amount,
+    current_balance: Number(vault.current_balance) + input.amount,
   }).eq('id', vaultId)
 
   await serviceClient.from('transactions').insert({
@@ -62,6 +63,7 @@ export async function depositToVault(
     description:        `Versement dans "${vault.name}"`,
     wallet_used:        input.wallet_type,
     external_reference: ref,
+    status:             'success'
   })
 
   revalidatePath('/epargne')
@@ -69,7 +71,7 @@ export async function depositToVault(
   return { success: true }
 }
 
-// RETRAIT — uniquement si status === 'debloque'
+// RETRAIT — Crédite maintenant le portefeuille
 export async function withdrawFromVault(vaultId: string): Promise<ActionResult<{ netAmount: number }>> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -80,21 +82,26 @@ export async function withdrawFromVault(vaultId: string): Promise<ActionResult<{
 
   if (!vault) return { error: 'Coffre introuvable' }
 
-  // ── VÉRIFICATION ABSOLUE ──────────────────────────────────────────────────
   if (new Date(vault.unlock_date) > new Date()) {
     const daysLeft = Math.ceil((new Date(vault.unlock_date).getTime() - Date.now()) / 86400000)
     return { error: `Retrait impossible. Il reste ${daysLeft} jour(s) avant le déblocage.` }
   }
-  if (vault.status !== 'debloque') {
+  if (vault.status !== 'debloque' && vault.status !== 'actif') {
     return { error: 'Le coffre n\'est pas encore débloqué.' }
   }
   if (vault.current_balance <= 0) {
     return { error: 'Solde insuffisant.' }
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
-  const { commission, netAmount } = calculateSavingsCommission(vault.current_balance)
-  const ref = `TG-WDRAW-${Date.now()}-${vaultId.slice(0, 6)}`
+  const { commission, netAmount } = calculateSavingsCommission(Number(vault.current_balance))
+
+  // ── CRÉDITER LE PORTEFEUILLE ──
+  await creditWalletFromVault({
+    userId:    user.id,
+    vaultId:   vault.id,
+    amount:    netAmount,
+    vaultName: vault.name,
+  })
 
   await serviceClient.from('savings_vaults').update({
     status:          'termine',
@@ -106,9 +113,8 @@ export async function withdrawFromVault(vaultId: string): Promise<ActionResult<{
     reference_id:       vaultId,
     type:               'retrait_epargne',
     amount:             netAmount,
-    description:        `Retrait coffre "${vault.name}" (commission: ${commission} FCFA)`,
-    wallet_used:        vault.wallet_destination,
-    external_reference: ref,
+    description:        `Épargne transférée vers portefeuille : "${vault.name}"`,
+    status:             'success'
   })
 
   await recordRevenue({
@@ -120,5 +126,6 @@ export async function withdrawFromVault(vaultId: string): Promise<ActionResult<{
   })
 
   revalidatePath('/epargne')
+  revalidatePath('/portefeuille')
   return { data: { netAmount }, success: true }
 }

@@ -2,6 +2,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import { phoneToFakeEmail, isValidCongoPhone, normalizePhone } from '@/lib/utils/auth-helpers'
 import { onboardingSchema } from '@/lib/validations/auth.schema'
 import type { ActionResult } from '@/lib/types'
@@ -217,18 +218,21 @@ export async function updateProfile(
     .eq('id', userId)
 
   if (error) return { error: error.message }
+
+  revalidatePath('/profile')
+  revalidatePath('/dashboard')
+
   return { success: true }
 }
 
 // UPLOAD AVATAR : retourne l'URL publique
 export async function uploadAvatar(
-  userId: string,
-  file: FormData
+  userId:   string,
+  file:     FormData
 ): Promise<ActionResult<{ url: string }>> {
   const imageFile = file.get('avatar') as File
   if (!imageFile) return { error: 'Aucun fichier fourni' }
 
-  // Vérifications
   if (imageFile.size > 2 * 1024 * 1024) {
     return { error: 'Image trop lourde (maximum 2 Mo)' }
   }
@@ -236,17 +240,43 @@ export async function uploadAvatar(
     return { error: 'Format invalide. Utilise JPG, PNG ou WebP.' }
   }
 
-  const ext      = imageFile.name.split('.').pop()
+  const ext      = imageFile.name.split('.').pop() ?? 'jpg'
   const fileName = `${userId}/avatar.${ext}`
 
+  // Upload avec cache-busting pour éviter les images obsolètes
   const { error: uploadError } = await serviceClient.storage
     .from('avatars')
-    .upload(fileName, imageFile, { upsert: true, contentType: imageFile.type })
+    .upload(fileName, imageFile, {
+      upsert:      true,       // Écraser si existe
+      contentType: imageFile.type,
+      cacheControl: '3600',
+    })
 
   if (uploadError) return { error: uploadError.message }
 
-  const { data } = serviceClient.storage.from('avatars').getPublicUrl(fileName)
-  return { data: { url: data.publicUrl } }
+  // Obtenir l'URL publique avec un timestamp pour invalider le cache navigateur
+  const { data } = serviceClient.storage
+    .from('avatars')
+    .getPublicUrl(fileName)
+
+  const urlWithTimestamp = `${data.publicUrl}?t=${Date.now()}`
+
+  // ── CORRECTION CRITIQUE : Sauvegarder immédiatement en base ──
+  const { error: updateError } = await serviceClient
+    .from('users')
+    .update({
+      avatar_url: urlWithTimestamp,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId)
+
+  if (updateError) return { error: updateError.message }
+
+  // Invalider le cache des pages qui affichent l'avatar
+  revalidatePath('/profile')
+  revalidatePath('/dashboard')
+
+  return { data: { url: urlWithTimestamp }, success: true }
 }
 
 // DÉCONNEXION
