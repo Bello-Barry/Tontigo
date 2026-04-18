@@ -1,3 +1,4 @@
+import { analyzeFugitiveBehavior } from "@/lib/ai/modules/behavioral-analysis"
 'use server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
@@ -288,6 +289,13 @@ async function processPayout(groupId: string, turnNumber: number): Promise<void>
     has_received_payout: true,
     payout_received_at:  new Date().toISOString(),
   }).eq('id', membership.id)
+
+  // S1: Analyse comportementale (fugitif potentiel) après versement
+  analyzeFugitiveBehavior({
+    userId:       membership.user_id,
+    membershipId: membership.id,
+    groupId:      groupId,
+  }).catch(console.error)
 
   await serviceClient.from('transactions').insert({
     user_id:      membership.user_id,

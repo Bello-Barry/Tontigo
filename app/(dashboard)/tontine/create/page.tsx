@@ -13,14 +13,17 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Sparkles, Info } from 'lucide-react'
 import Link from 'next/link'
 import { formatFCFA } from '@/lib/utils/format'
+import { getGroupAdvice } from '@/lib/actions/ia-advisor.actions'
 import { calculateGuarantee } from '@/lib/utils/guarantee'
 
 export default function CreateGroupPage() {
   const router  = useRouter()
   const [loading, setLoading] = useState(false)
+  const [adviceLoading, setAdviceLoading] = useState(false)
+  const [aiAdvice, setAiAdvice] = useState<any>(null)
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CreateGroupInput>({
     resolver: zodResolver(createGroupSchema) as any,
@@ -45,6 +48,28 @@ export default function CreateGroupPage() {
   const estimatedGuarantee = requiresGuarantee
     ? calculateGuarantee(1, maxMembers, amount)
     : 0
+
+
+  const handleGetAdvice = async () => {
+    setAdviceLoading(true)
+    try {
+      const result = await getGroupAdvice({
+        invitedUserIds:  [], // For now, handle as empty or from invited logic if present
+        desiredAmount:   amount,
+        desiredFrequency: watch('frequency'),
+      })
+      if (result.data) {
+        setAiAdvice(result.data as any)
+        // Auto-fill recommendations
+        setValue('penalty_rate', result.data.recommended_penalty)
+        toast.info("💡 L'IA a optimisé tes paramètres !")
+      }
+    } catch {
+      toast.error('Erreur lors du conseil IA')
+    } finally {
+      setAdviceLoading(false)
+    }
+  }
 
   const onSubmit = async (data: CreateGroupInput) => {
     setLoading(true)
@@ -228,6 +253,37 @@ export default function CreateGroupPage() {
             </p>
           </div>
         )}
+
+
+        {/* Conseil IA */}
+        <div className="space-y-3 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={adviceLoading || amount <= 0}
+            onClick={handleGetAdvice}
+            className="w-full border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 flex items-center justify-center gap-2"
+          >
+            {adviceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Optimiser avec Likelemba IA
+          </Button>
+
+          {aiAdvice && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1 rounded bg-emerald-500 text-white">
+                  <Sparkles className="w-3 h-3" />
+                </div>
+                <span className="text-emerald-400 text-xs font-bold uppercase tracking-wider">Conseil de Likelemba</span>
+              </div>
+              <p className="text-emerald-100 text-sm leading-relaxed">{aiAdvice.advice}</p>
+              <div className="mt-3 flex items-center gap-2 text-xs text-emerald-400/70">
+                <Info className="w-3 h-3" />
+                <span>Risque estimé : {aiAdvice.risk_assessment}</span>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Bouton soumettre */}
         <Button
