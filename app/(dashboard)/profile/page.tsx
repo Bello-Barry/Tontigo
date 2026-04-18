@@ -7,6 +7,7 @@ import { LogoutButton } from '@/components/auth/LogoutButton'
 import { formatDate } from '@/lib/utils/format'
 import { Shield, BarChart3 } from 'lucide-react'
 import Image from 'next/image'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 
 export default async function ProfilPage() {
   const supabase = await createServerSupabaseClient()
@@ -122,6 +123,14 @@ export default async function ProfilPage() {
           avatar_url:    profile.avatar_url    ?? '',
         }}
       />
+
+      {/* Préférences */}
+      <div className="space-y-3">
+        <h2 className="text-slate-300 font-semibold text-sm px-1">Préférences</h2>
+        <div className="glass-card p-2">
+           <ThemeToggle />
+        </div>
+      </div>
 
       {/* Bouton déconnexion */}
       <div className="pt-4 pb-12 border-t border-slate-700">

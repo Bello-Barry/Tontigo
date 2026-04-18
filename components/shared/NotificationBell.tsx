@@ -38,6 +38,19 @@ export function NotificationBell() {
     setLoading(false)
   }
 
+  const markAsRead = async (notifId: string) => {
+    if (!user) return
+    await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notifId)
+
+    setNotifications(prev =>
+      prev.map(n => n.id === notifId ? { ...n, is_read: true } : n)
+    )
+    setUnreadCount(prev => Math.max(0, prev - 1))
+  }
+
   const markAllAsRead = async () => {
     if (!user) return
     await supabase
@@ -48,6 +61,31 @@ export function NotificationBell() {
 
     setUnreadCount(0)
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+  }
+
+  const deleteNotification = async (notifId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!user) return
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', notifId)
+
+    setNotifications(prev => prev.filter(n => n.id !== notifId))
+    // If it was unread, update count
+    const wasUnread = notifications.find(n => n.id === notifId && !n.is_read)
+    if (wasUnread) setUnreadCount(prev => Math.max(0, prev - 1))
+  }
+
+  const deleteAllRead = async () => {
+    if (!user) return
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('is_read', true)
+
+    setNotifications(prev => prev.filter(n => !n.is_read))
   }
 
   useEffect(() => {
@@ -83,16 +121,32 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent className="w-80 sm:w-96 p-0 glass-card border border-slate-700 shadow-xl overflow-hidden" align="end">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900/50">
-          <h4 className="font-semibold text-white">Notifications</h4>
-          {unreadCount > 0 && (
-            <button
-              onClick={markAllAsRead}
-              className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
-            >
-              <CheckCircle2 className="w-3 h-3" />
-              Tout marquer lu
-            </button>
-          )}
+          <div className="flex flex-col">
+            <h4 className="font-semibold text-white">Notifications</h4>
+            {unreadCount > 0 && (
+              <span className="text-[10px] text-emerald-400">(${unreadCount} nouvelles)</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+                title="Tout marquer lu"
+              >
+                Tout lire
+              </button>
+            )}
+            {notifications.some(n => n.is_read) && (
+              <button
+                onClick={deleteAllRead}
+                className="text-[10px] text-slate-500 hover:text-red-400 transition-colors"
+                title="Supprimer les lues"
+              >
+                Effacer lues
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto divide-y divide-slate-700/50">
@@ -117,12 +171,14 @@ export function NotificationBell() {
             notifications.map((notif) => (
               <div
                 key={notif.id}
-                className={`flex gap-3 px-4 py-3 hover:bg-slate-700/30 transition-colors ${!notif.is_read ? 'bg-emerald-500/5' : ''}`}
+                onClick={() => !notif.is_read && markAsRead(notif.id)}
+                className={`group relative flex gap-3 px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer ${!notif.is_read ? 'bg-emerald-500/5' : ''}`}
               >
                 {!notif.is_read && (
                   <div className="w-2 h-2 bg-emerald-400 rounded-full shrink-0 mt-1.5" />
                 )}
-                <div className="flex-1 min-w-0">
+                {notif.is_read && <div className="w-2 shrink-0" />}
+                <div className="flex-1 min-w-0 pr-6">
                   <p className={`text-sm ${!notif.is_read ? 'text-white font-medium' : 'text-slate-300'}`}>
                     {notif.title}
                   </p>
@@ -133,6 +189,12 @@ export function NotificationBell() {
                     {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: fr })}
                   </p>
                 </div>
+                <button
+                  onClick={(e) => deleteNotification(notif.id, e)}
+                  className="absolute right-2 top-3 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-slate-600 transition-all"
+                >
+                  <X className="w-3 h-3 text-slate-500" />
+                </button>
               </div>
             ))
           )}

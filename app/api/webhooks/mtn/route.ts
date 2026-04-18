@@ -36,19 +36,23 @@ export async function POST(request: Request) {
 
           if (membership) {
             await serviceClient.from('memberships').update({
-              total_paid: membership.total_paid + contrib.amount
+              total_paid: Number(membership.total_paid) + Number(contrib.amount)
             }).eq('id', contrib.membership_id)
           }
+
+          // Vérifier si le tour est fini et déclencher le payout
+          const { checkPayoutsStatus } = await import('@/lib/actions/tontine.actions')
+          await checkPayoutsStatus(contrib.group_id).catch(console.error)
         }
-      } else if (status === 'FAILED') {
-        // Gérer l'échec...
       }
-    } else if (externalId.startsWith('TG-PRO-')) {
-      // Traitement abonnement pro
+    } else if (externalId.startsWith('LK-WALLET-')) {
+        // Traitement retrait portefeuille (disbursement callback)
+        // Logique à implémenter selon le retour MTN
     }
 
     return NextResponse.json({ received: true })
   } catch (error) {
+    console.error('Webhook error:', error)
     return NextResponse.json({ error: 'Webhook error' }, { status: 500 })
   }
 }

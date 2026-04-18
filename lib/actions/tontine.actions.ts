@@ -16,36 +16,40 @@ export async function createGroup(data: any): Promise<ActionResult<{ id: string 
 
   const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
 
-  const { data: group, error } = await serviceClient
-    .from('tontine_groups')
-    .insert({
-      ...data,
-      creator_id: user.id,
-      invite_code: inviteCode,
-      current_members: 1,
-      status: 'en_attente',
+  try {
+    const { data: group, error } = await serviceClient
+      .from('tontine_groups')
+      .insert({
+        ...data,
+        creator_id: user.id,
+        invite_code: inviteCode,
+        current_members: 1,
+        status: 'en_attente',
+      })
+      .select()
+      .single()
+
+    if (error) return { error: error.message }
+
+    // Créer le membership du créateur
+    await serviceClient.from('memberships').insert({
+      group_id: group.id,
+      user_id: user.id,
+      turn_position: 1,
+      status: 'actif',
     })
-    .select()
-    .single()
 
-  if (error) return { error: error.message }
+    // Créer le pool de solidarité
+    await serviceClient.from('solidarity_pool').insert({
+      group_id: group.id,
+      balance: 0,
+    })
 
-  // Créer le membership du créateur
-  await serviceClient.from('memberships').insert({
-    group_id: group.id,
-    user_id: user.id,
-    turn_position: 1,
-    status: 'actif',
-  })
-
-  // Créer le pool de solidarité
-  await serviceClient.from('solidarity_pool').insert({
-    group_id: group.id,
-    balance: 0,
-  })
-
-  revalidatePath('/tontine')
-  return { data: { id: group.id }, success: true }
+    revalidatePath('/tontine')
+    return { data: { id: group.id }, success: true }
+  } catch (err: any) {
+    return { error: 'Erreur lors de la création du groupe' }
+  }
 }
 
 // REJOINDRE UN GROUPE PAR CODE
@@ -54,61 +58,65 @@ export async function joinGroupByCode(code: string): Promise<ActionResult<{ id: 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  const { data: group, error: gError } = await serviceClient
-    .from('tontine_groups')
-    .select('*')
-    .eq('invite_code', code.toUpperCase())
-    .single()
+  try {
+    const { data: group, error: gError } = await serviceClient
+      .from('tontine_groups')
+      .select('*')
+      .eq('invite_code', code.toUpperCase())
+      .single()
 
-  if (gError || !group) return { error: 'Code d\'invitation invalide.' }
-  if (group.status !== 'en_attente') return { error: 'Ce groupe a déjà démarré.' }
-  if (group.current_members >= group.max_members) return { error: 'Groupe complet.' }
+    if (gError || !group) return { error: 'Code d\'invitation invalide.' }
+    if (group.status !== 'en_attente') return { error: 'Ce groupe a déjà démarré.' }
+    if (group.current_members >= group.max_members) return { error: 'Groupe complet.' }
 
-  const { data: profile } = await supabase.from('users').select('trust_score').eq('id', user.id).single()
-  if (profile && profile.trust_score < group.min_trust_score) {
-    return { error: `Score de confiance insuffisant. Requis: ${group.min_trust_score}, le tien: ${profile.trust_score}` }
+    const { data: profile } = await supabase.from('users').select('trust_score').eq('id', user.id).single()
+    if (profile && profile.trust_score < group.min_trust_score) {
+      return { error: `Score de confiance insuffisant. Requis: ${group.min_trust_score}, le tien: ${profile.trust_score}` }
+    }
+
+    // Vérifier si déjà membre
+    const { data: existing } = await serviceClient
+      .from('memberships').select('id').eq('group_id', group.id).eq('user_id', user.id).maybeSingle()
+    if (existing) return { error: 'Tu es déjà membre de ce groupe.' }
+
+    const nextPosition = group.current_members + 1
+    const guarantee = group.requires_guarantee
+      ? calculateGuarantee(nextPosition, group.max_members, group.amount)
+      : 0
+
+    const { error: mError } = await serviceClient.from('memberships').insert({
+      group_id:         group.id,
+      user_id:          user.id,
+      turn_position:    nextPosition,
+      guarantee_amount: guarantee,
+    })
+    if (mError) return { error: mError.message }
+
+    await serviceClient.from('tontine_groups')
+      .update({ current_members: nextPosition })
+      .eq('id', group.id)
+
+    // Notifier les autres membres
+    const { data: others } = await serviceClient
+      .from('memberships').select('user_id').eq('group_id', group.id).neq('user_id', user.id)
+
+    if (others?.length) {
+      await serviceClient.from('notifications').insert(
+        others.map(m => ({
+          user_id:      m.user_id,
+          title:        'Nouveau membre',
+          body:         `Un nouveau membre a rejoint "${group.name}".`,
+          type:         'new_member',
+          reference_id: group.id,
+        }))
+      )
+    }
+
+    revalidatePath('/tontine')
+    return { data: { id: group.id }, success: true }
+  } catch (err: any) {
+    return { error: 'Erreur lors de l\'adhésion au groupe' }
   }
-
-  // Vérifier si déjà membre
-  const { data: existing } = await serviceClient
-    .from('memberships').select('id').eq('group_id', group.id).eq('user_id', user.id).maybeSingle()
-  if (existing) return { error: 'Tu es déjà membre de ce groupe.' }
-
-  const nextPosition = group.current_members + 1
-  const guarantee = group.requires_guarantee
-    ? calculateGuarantee(nextPosition, group.max_members, group.amount)
-    : 0
-
-  const { error: mError } = await serviceClient.from('memberships').insert({
-    group_id:         group.id,
-    user_id:          user.id,
-    turn_position:    nextPosition,
-    guarantee_amount: guarantee,
-  })
-  if (mError) return { error: mError.message }
-
-  await serviceClient.from('tontine_groups')
-    .update({ current_members: nextPosition })
-    .eq('id', group.id)
-
-  // Notifier les autres membres
-  const { data: others } = await serviceClient
-    .from('memberships').select('user_id').eq('group_id', group.id).neq('user_id', user.id)
-
-  if (others?.length) {
-    await serviceClient.from('notifications').insert(
-      others.map(m => ({
-        user_id:      m.user_id,
-        title:        'Nouveau membre',
-        body:         `Un nouveau membre a rejoint "${group.name}".`,
-        type:         'new_member',
-        reference_id: group.id,
-      }))
-    )
-  }
-
-  revalidatePath('/tontine')
-  return { data: { id: group.id }, success: true }
 }
 
 // DÉMARRER UN GROUPE
@@ -117,53 +125,57 @@ export async function startGroup(groupId: string): Promise<ActionResult> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  const { data: group } = await serviceClient
-    .from('tontine_groups').select('*').eq('id', groupId).single()
+  try {
+    const { data: group } = await serviceClient
+      .from('tontine_groups').select('*').eq('id', groupId).single()
 
-  if (!group)                      return { error: 'Groupe introuvable' }
-  if (group.creator_id !== user.id) return { error: 'Seul le créateur peut démarrer le groupe' }
-  if (group.current_members < 2)    return { error: 'Minimum 2 membres requis' }
-  if (group.status !== 'en_attente') return { error: 'Le groupe est déjà démarré' }
+    if (!group)                      return { error: 'Groupe introuvable' }
+    if (group.creator_id !== user.id) return { error: 'Seul le créateur peut démarrer le groupe' }
+    if (group.current_members < 2)    return { error: 'Minimum 2 membres requis' }
+    if (group.status !== 'en_attente') return { error: 'Le groupe est déjà démarré' }
 
-  const dueDate = getNextDueDate(group.frequency)
+    const dueDate = getNextDueDate(group.frequency)
 
-  const { data: members } = await serviceClient
-    .from('memberships').select('id').eq('group_id', groupId).eq('status', 'actif')
+    const { data: members } = await serviceClient
+      .from('memberships').select('id').eq('group_id', groupId).eq('status', 'actif')
 
-  if (members?.length) {
-    await serviceClient.from('contributions').insert(
-      members.map(m => ({
-        membership_id: m.id,
-        group_id:      groupId,
-        amount:        group.amount,
-        due_date:      dueDate,
-        status:        'en_attente' as const,
-      }))
-    )
+    if (members?.length) {
+      await serviceClient.from('contributions').insert(
+        members.map(m => ({
+          membership_id: m.id,
+          group_id:      groupId,
+          amount:        group.amount,
+          due_date:      dueDate,
+          status:        'en_attente' as const,
+        }))
+      )
+    }
+
+    await serviceClient.from('tontine_groups').update({
+      status:     'actif',
+      started_at: new Date().toISOString(),
+    }).eq('id', groupId)
+
+    // Notifier tous les membres
+    const { data: allMembers } = await serviceClient
+      .from('memberships').select('user_id').eq('group_id', groupId)
+    if (allMembers) {
+      await serviceClient.from('notifications').insert(
+        allMembers.map(m => ({
+          user_id:      m.user_id,
+          title:        '🚀 Tontine démarrée !',
+          body:         `"${group.name}" est maintenant active. Première cotisation due le ${dueDate}.`,
+          type:         'group_started',
+          reference_id: groupId,
+        }))
+      )
+    }
+
+    revalidatePath(`/tontine/${groupId}`)
+    return { success: true }
+  } catch (err: any) {
+    return { error: 'Erreur lors du démarrage du groupe' }
   }
-
-  await serviceClient.from('tontine_groups').update({
-    status:     'actif',
-    started_at: new Date().toISOString(),
-  }).eq('id', groupId)
-
-  // Notifier tous les membres
-  const { data: allMembers } = await serviceClient
-    .from('memberships').select('user_id').eq('group_id', groupId)
-  if (allMembers) {
-    await serviceClient.from('notifications').insert(
-      allMembers.map(m => ({
-        user_id:      m.user_id,
-        title:        '🚀 Tontine démarrée !',
-        body:         `"${group.name}" est maintenant active. Première cotisation due le ${dueDate}.`,
-        type:         'group_started',
-        reference_id: groupId,
-      }))
-    )
-  }
-
-  revalidatePath(`/tontine/${groupId}`)
-  return { success: true }
 }
 
 // PAYER UNE COTISATION
@@ -175,66 +187,70 @@ export async function payContribution(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  const { data: contribution } = await serviceClient
-    .from('contributions')
-    .select('*, memberships(total_paid, user_id)')
-    .eq('id', contributionId)
-    .single()
+  try {
+    const { data: contribution } = await serviceClient
+      .from('contributions')
+      .select('*, memberships(total_paid, user_id)')
+      .eq('id', contributionId)
+      .single()
 
-  if (!contribution) return { error: 'Cotisation introuvable' }
-  if (contribution.status === 'paye') return { error: 'Cette cotisation est déjà payée' }
+    if (!contribution) return { error: 'Cotisation introuvable' }
+    if (contribution.status === 'paye') return { error: 'Cette cotisation est déjà payée' }
 
-  const membership = contribution.memberships as unknown as { total_paid: number; user_id: string }
-  if (membership.user_id !== user.id) return { error: 'Non autorisé' }
+    const membership = contribution.memberships as unknown as { total_paid: number; user_id: string }
+    if (membership.user_id !== user.id) return { error: 'Non autorisé' }
 
-  const paymentRef = `TG-COT-${Date.now()}-${contributionId.slice(0, 6)}`
+    const paymentRef = `TG-COT-${Date.now()}-${contributionId.slice(0, 6)}`
 
-  // Simuler le succès du paiement
-  const paymentSuccess = true
-  if (!paymentSuccess) return { error: 'Échec du paiement mobile' }
+    // Simuler le succès du paiement
+    const paymentSuccess = true
+    if (!paymentSuccess) return { error: 'Échec du paiement mobile' }
 
-  await serviceClient.from('contributions').update({
-    status:            'paye',
-    paid_at:           new Date().toISOString(),
-    payment_reference: paymentRef,
-  }).eq('id', contributionId)
+    await serviceClient.from('contributions').update({
+      status:            'paye',
+      paid_at:           new Date().toISOString(),
+      payment_reference: paymentRef,
+    }).eq('id', contributionId)
 
-  await serviceClient.from('memberships').update({
-    total_paid: Number(membership.total_paid) + contribution.amount,
-  }).eq('id', contribution.membership_id)
+    await serviceClient.from('memberships').update({
+      total_paid: Number(membership.total_paid) + contribution.amount,
+    }).eq('id', contribution.membership_id)
 
-  // Alimenter le pool de solidarité (2%)
-  const solidarityAmount = Math.round(contribution.amount * 0.02)
-  await serviceClient.rpc('increment_solidarity_pool', {
-    p_group_id: contribution.group_id,
-    p_amount:   solidarityAmount,
-  })
+    // Alimenter le pool de solidarité (2%)
+    const solidarityAmount = Math.round(contribution.amount * 0.02)
+    await serviceClient.rpc('increment_solidarity_pool', {
+      p_group_id: contribution.group_id,
+      p_amount:   solidarityAmount,
+    })
 
-  // Transaction
-  await serviceClient.from('transactions').insert({
-    user_id:            user.id,
-    reference_id:       contributionId,
-    type:               'cotisation',
-    amount:             contribution.amount,
-    wallet_used:        walletType,
-    external_reference: paymentRef,
-    status:             'success'
-  })
+    // Transaction
+    await serviceClient.from('transactions').insert({
+      user_id:            user.id,
+      reference_id:       contributionId,
+      type:               'cotisation',
+      amount:             contribution.amount,
+      wallet_used:        walletType,
+      external_reference: paymentRef,
+      status:             'success'
+    })
 
-  // +2 points de confiance pour paiement à temps
-  if (contribution.days_late === 0) {
-    await serviceClient.rpc('update_trust_score', { p_user_id: user.id, p_delta: 2 })
+    // +2 points de confiance pour paiement à temps
+    if (contribution.days_late === 0) {
+      await serviceClient.rpc('update_trust_score', { p_user_id: user.id, p_delta: 2 })
+    }
+
+    // Vérifier si toutes les cotisations du tour sont payées → déclencher le versement
+    await checkPayoutsStatus(contribution.group_id)
+
+    revalidatePath(`/tontine/${contribution.group_id}`)
+    return { data: { reference: paymentRef }, success: true }
+  } catch (err: any) {
+    return { error: 'Erreur lors du paiement' }
   }
-
-  // Vérifier si toutes les cotisations du tour sont payées → déclencher le versement
-  await checkAndProcessPayout(contribution.group_id)
-
-  revalidatePath(`/tontine/${contribution.group_id}`)
-  return { data: { reference: paymentRef }, success: true }
 }
 
 // Vérifier si toutes les cotisations sont payées et verser la cagnotte
-async function checkAndProcessPayout(groupId: string): Promise<void> {
+export async function checkPayoutsStatus(groupId: string): Promise<void> {
   const { data: group } = await serviceClient
     .from('tontine_groups').select('*').eq('id', groupId).single()
   if (!group || group.status !== 'actif') return
@@ -366,37 +382,41 @@ export async function reportFugitive(groupId: string, memberId: string): Promise
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  await serviceClient.from('memberships').update({ status: 'fugitif' })
-    .eq('group_id', groupId).eq('user_id', memberId)
+  try {
+    await serviceClient.from('memberships').update({ status: 'fugitif' })
+      .eq('group_id', groupId).eq('user_id', memberId)
 
-  const { data: membership } = await serviceClient
-    .from('memberships').select('guarantee_amount').eq('group_id', groupId).eq('user_id', memberId).single()
+    const { data: membership } = await serviceClient
+      .from('memberships').select('guarantee_amount').eq('group_id', groupId).eq('user_id', memberId).single()
 
-  if (membership && membership.guarantee_amount > 0) {
-    await serviceClient.rpc('seize_guarantee_and_redistribute', {
-      p_group_id:          groupId,
-      p_fugitive_user_id:  memberId,
-      p_guarantee_amount:  membership.guarantee_amount,
-    })
+    if (membership && membership.guarantee_amount > 0) {
+      await serviceClient.rpc('seize_guarantee_and_redistribute', {
+        p_group_id:          groupId,
+        p_fugitive_user_id:  memberId,
+        p_guarantee_amount:  membership.guarantee_amount,
+      })
+    }
+
+    const { data: fugitive } = await serviceClient.from('users').select('phone').eq('id', memberId).single()
+    if (fugitive) {
+      await serviceClient.from('phone_blacklist').upsert({
+        phone:  fugitive.phone,
+        reason: `Fuite après réception de cagnotte — Groupe ${groupId}`,
+      }, { onConflict: 'phone' })
+
+      await serviceClient.from('users').update({
+        is_banned:   true,
+        trust_score: 0,
+        badge:       'fraudeur',
+        status:      'banni',
+      }).eq('id', memberId)
+    }
+
+    revalidatePath(`/tontine/${groupId}`)
+    return { success: true }
+  } catch (err: any) {
+    return { error: 'Erreur lors du signalement' }
   }
-
-  const { data: fugitive } = await serviceClient.from('users').select('phone').eq('id', memberId).single()
-  if (fugitive) {
-    await serviceClient.from('phone_blacklist').upsert({
-      phone:  fugitive.phone,
-      reason: `Fuite après réception de cagnotte — Groupe ${groupId}`,
-    }, { onConflict: 'phone' })
-
-    await serviceClient.from('users').update({
-      is_banned:   true,
-      trust_score: 0,
-      badge:       'fraudeur',
-      status:      'banni',
-    }).eq('id', memberId)
-  }
-
-  revalidatePath(`/tontine/${groupId}`)
-  return { success: true }
 }
 
 function getNextDueDate(frequency: string): string {

@@ -17,15 +17,15 @@ export async function sendMessage(
   if (!trimmed) return { error: 'Message vide' }
 
   try {
-    // Vérifier que l'utilisateur est membre
-    const { data: membership } = await supabase
+    const { data: membership } = await serviceClient
       .from('memberships')
-      .select('id')
+      .select('id, status')
       .eq('group_id', groupId)
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (!membership) return { error: 'Non autorisé' }
+    if (!membership)               return { error: 'Tu n\'est pas membre de ce groupe' }
+    if (membership.status !== 'actif') return { error: 'Ton membership n\'est plus actif' }
 
     const { data, error } = await serviceClient
       .from('group_messages')
@@ -39,7 +39,6 @@ export async function sendMessage(
 
     if (error) return { error: error.message }
 
-    // S5: Modération automatique du chat en arrière-plan
     moderateMessage({
       messageId: data.id,
       content:   trimmed,
@@ -55,48 +54,56 @@ export async function sendMessage(
 }
 
 export async function sendAudioMessage(
-  groupId: string,
-  audioUrl: string,
+  groupId:         string,
+  audioUrl:        string,
   durationSeconds: number
 ): Promise<ActionResult<{ id: string }>> {
-  // Validation stricte des inputs
-  if (!groupId || !audioUrl)        return { error: 'Paramètres invalides' }
-  if (durationSeconds < 0)          return { error: 'Durée invalide' }
-  if (!audioUrl.startsWith('http')) return { error: 'URL audio invalide' }
+
+  if (!groupId)                         return { error: 'groupId manquant' }
+  if (!audioUrl)                        return { error: 'audioUrl manquant' }
+  if (!audioUrl.startsWith('https://')) return { error: 'URL audio invalide' }
+  if (durationSeconds < 0)              return { error: 'Durée invalide' }
 
   try {
     const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Non authentifié' }
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    // Vérifier que l'utilisateur est membre
-    const { data: membership } = await supabase
+    if (authError || !user) return { error: 'Non authentifié' }
+
+    const { data: membership } = await serviceClient
       .from('memberships')
-      .select('id')
+      .select('id, status')
       .eq('group_id', groupId)
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (!membership) return { error: 'Non autorisé' }
+    if (!membership)               return { error: 'Tu n\'est pas membre de ce groupe' }
+    if (membership.status !== 'actif') return { error: 'Ton membership n\'est plus actif' }
 
     const { data, error } = await serviceClient
       .from('group_messages')
       .insert({
-        group_id:                groupId,
-        user_id:                 user.id,
-        content:                 '🎤 Message vocal',  // Fallback texte
-        message_type:            'audio',
-        audio_url:               audioUrl,
-        audio_duration_seconds:  Math.round(durationSeconds),
+        group_id:               groupId,
+        user_id:                user.id,
+        content:                '🎤 Message vocal',
+        message_type:           'audio',
+        audio_url:              audioUrl,
+        audio_duration_seconds: Math.round(Math.max(0, durationSeconds)),
+        is_deleted:             false,
       })
       .select('id')
       .single()
 
-    if (error) return { error: error.message }
+    if (error) {
+      console.error('sendAudioMessage DB error:', error)
+      return { error: `Erreur base de données: ${error.message}` }
+    }
+
     return { data: { id: data.id }, success: true }
-  } catch (err: any) {
-    console.error('sendAudioMessage error:', err)
-    return { error: 'Erreur lors de l\'envoi du message vocal' }
+
+  } catch (error: any) {
+    console.error('sendAudioMessage unexpected error:', error?.message)
+    return { error: 'Erreur inattendue lors de l\'envoi' }
   }
 }
 
@@ -106,7 +113,6 @@ export async function deleteMessage(messageId: string): Promise<ActionResult> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Non authentifié' }
 
-    // Soft delete en mettant à jour is_deleted
     const { error } = await supabase
       .from('group_messages')
       .update({ is_deleted: true })
