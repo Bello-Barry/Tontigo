@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { phoneToFakeEmail, isValidCongoPhone, normalizePhone } from '@/lib/utils/auth-helpers'
 import { onboardingSchema } from '@/lib/validations/auth.schema'
 import type { ActionResult } from '@/lib/types'
+import { detectDuplicateAccount } from '@/lib/ai/modules/duplicate-detection'
 
 // INSCRIPTION : numéro + PIN
 export async function registerWithPin(
@@ -181,6 +182,9 @@ export async function completeOnboarding(
     .eq('id', userId)
 
   if (error) return { error: error.message }
+
+  // S3: Détection de comptes multiples en arrière-plan
+  detectDuplicateAccount(userId).catch(console.error)
 
   redirect('/dashboard')
 }

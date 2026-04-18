@@ -7,6 +7,7 @@ import { sortGroupsByMatchScore } from '@/lib/utils/matching'
 import { calculateGuarantee } from '@/lib/utils/guarantee'
 import type { ActionResult, MatchingProfile, TontineGroup } from '@/lib/types'
 import type { MatchingFilterInput } from '@/lib/validations/matching.schema'
+import { assessMatchingRisk } from '@/lib/ai/modules/matching-risk'
 
 export async function findMatchingGroups(
   filters: MatchingFilterInput
@@ -46,6 +47,18 @@ export async function joinViaMatching(groupId: string): Promise<ActionResult> {
 
   const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single()
   if (!profile) return { error: 'Profil introuvable' }
+
+  // S4: Scoring de risque avant matching
+  const riskAssessment = await assessMatchingRisk({
+    userId:  user.id,
+    groupId: groupId,
+  })
+
+  if (!riskAssessment.can_join && riskAssessment.risk_score >= 80) {
+    return {
+      error: `Ton profil ne correspond pas aux critères de sécurité de ce groupe. ${riskAssessment.reasons[0] ?? ''}`,
+    }
+  }
 
   const hasPro = profile.subscription_plan === 'pro' &&
     profile.subscription_expires_at &&
