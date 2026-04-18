@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/rappels",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/amendes",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/epargne-unlock",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/rapports-mensuels",
+      "schedule": "0 9 1 * *"
+    }
+  ]
+}

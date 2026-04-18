@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useChat } from '@ai-sdk/react'
+
 import {
   Send,
   Bot,
@@ -48,40 +48,11 @@ export function AICoach() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const { 
-    messages, 
-    setMessages,
-    sendMessage,
-    status,
-    error 
-  } = useChat({
-    onFinish: async (event) => {
-      const message = event.message;
-      const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.parts
-        .filter(p => p.type === 'text')
-        .map(p => p.text)
-        .join('') || chatInput
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [messages, setMessages] = useState<any[]>([])
 
-      const replyText = message.parts
-        .filter(p => p.type === 'text')
-        .map(p => p.text)
-        .join('')
 
-      const result = await saveAIConversation(
-        activeConversationId,
-        lastUserMessage,
-        replyText,
-        []
-      )
-
-      if (result.data?.conversationId && !activeConversationId) {
-        setActiveConversationId(result.data.conversationId)
-        loadHistory()
-      }
-    }
-  })
-
-  const isLoading = status === 'submitted' || status === 'streaming'
 
   useEffect(() => {
     const getUser = async () => {
@@ -95,12 +66,12 @@ export function AICoach() {
   useEffect(() => {
     if (isOpen) {
       setView('chat')
-      loadHistory()
+      refreshConversations()
       setTimeout(() => inputRef.current?.focus(), 150)
     }
   }, [isOpen])
 
-  const loadHistory = async () => {
+  const refreshConversations = async () => {
     const result = await getAIConversations()
     if (result.data) {
       setConversations(result.data)
@@ -115,18 +86,68 @@ export function AICoach() {
     scrollToBottom()
   }, [messages])
 
-  const handleCustomSubmit = async (e: React.FormEvent) => {
+    const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!chatInput.trim() || isLoading) return
+    const trimmed = chatInput.trim()
+    if (!trimmed || isLoading) return
 
-    const message = chatInput
     setChatInput('')
-    
-    sendMessage({
-      text: message
-    })
-  }
+    setIsLoading(true)
+    setError(null)
 
+    const userMsg = { id: Date.now().toString(), role: 'user', content: trimmed }
+    const newHistory = [...messages, userMsg]
+    setMessages(newHistory)
+
+    const streamingMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: '' }
+    setMessages([...newHistory, streamingMsg])
+
+    try {
+      const response = await fetch('/api/ia/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: trimmed,
+          history: messages.map((m: any) => ({ role: m.role, content: m.content || '' })),
+          conversationId: activeConversationId,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Erreur API IA')
+
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let fullText = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        fullText += chunk
+
+        setMessages(prev => {
+          const updated = [...prev]
+          const lastIndex = updated.length - 1
+          if (updated[lastIndex].role === 'assistant') {
+            updated[lastIndex] = { ...updated[lastIndex], content: fullText }
+          }
+          return updated
+        })
+
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }
+
+      refreshConversations()
+
+    } catch (err: any) {
+      setError(err.message)
+      toast.error("L'IA est momentanément indisponible.")
+    } finally {
+      setIsLoading(false)
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
+  }
   const startNewConversation = () => {
     setActiveConversationId(null)
     setMessages([])
@@ -280,12 +301,17 @@ export function AICoach() {
                       {m.role === 'user' ? <User size={14} /> : <Bot size={14} />}
                     </div>
                     <div className={cn(
-                      "p-3 rounded-2xl text-sm leading-relaxed shadow-sm",
+                      "p-3 rounded-2xl text-sm leading-relaxed shadow-sm relative",
                       m.role === 'user'
                         ? "bg-emerald-600/10 text-emerald-50 border border-emerald-600/20 rounded-tr-none"
                         : "bg-slate-900 text-slate-200 border border-slate-800 rounded-tl-none"
                     )}>
-                      {renderMessageContent(m)}
+                      <span className="whitespace-pre-wrap break-words">
+                        {renderMessageContent(m)}
+                        {isLoading && m.role === 'assistant' && m === messages[messages.length - 1] && (
+                          <span className="inline-block w-1 h-4 bg-emerald-500 ml-1 animate-pulse align-middle" />
+                        )}
+                      </span>
                     </div>
                   </div>
                 ))}

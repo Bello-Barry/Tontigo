@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { serviceClient } from '@/lib/supabase/service'
+import { analyzePaymentRisk } from '@/lib/ai/modules/payment-risk'
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
@@ -11,6 +12,10 @@ export async function GET(request: Request) {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
     const tomorrowStr = tomorrow.toISOString().split('T')[0]
+
+    const threeDaysFromNow = new Date()
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3)
+    const threeDaysFromNowStr = threeDaysFromNow.toISOString().split('T')[0]
 
     const { data: dueContribs } = await serviceClient
       .from('contributions')
@@ -28,6 +33,22 @@ export async function GET(request: Request) {
           reference_id: c.group_id
         }))
       )
+    }
+
+    // M1: Analyse prédictive des risques à J+3
+    const { data: upcomingContribs } = await serviceClient
+      .from('contributions')
+      .select('membership_id, group_id')
+      .eq('due_date', threeDaysFromNowStr)
+      .eq('status', 'en_attente')
+
+    if (upcomingContribs) {
+      for (const contrib of upcomingContribs) {
+        analyzePaymentRisk({
+          membershipId: contrib.membership_id,
+          groupId:      contrib.group_id,
+        }).catch(console.error)
+      }
     }
 
     return NextResponse.json({ success: true, count: dueContribs?.length || 0 })

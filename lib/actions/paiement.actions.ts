@@ -1,5 +1,8 @@
 'use server'
 
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { verifyTransactionCoherence } from '@/lib/ai/modules/transaction-verification'
+
 // ─── MTN Mobile Money (Congo Brazzaville) ────────────────────
 export async function initiateMtnCollection(params: {
   phone:       string
@@ -7,6 +10,23 @@ export async function initiateMtnCollection(params: {
   reference:   string
   description: string
 }): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    // S2: Vérification cohérence transaction
+    const verification = await verifyTransactionCoherence({
+      mtnTransactionId: params.reference,
+      userId:           user.id,
+      amount:           params.amount,
+      transactionType:  'collection',
+    })
+
+    if (verification.recommended_action === 'block') {
+      return { success: false, error: 'Transaction bloquée par la sécurité : ' + verification.anomalies.join(', ') }
+    }
+  }
+
   try {
     const response = await fetch(
       `${process.env.MTN_MOMO_BASE_URL}/collection/v1_0/requesttopay`,
@@ -41,6 +61,23 @@ export async function initiateMtnDisbursement(params: {
   reference:   string
   description: string
 }): Promise<{ success: boolean; error?: string }> {
+  // S2: On vérifie aussi les décaissements (payouts)
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    const verification = await verifyTransactionCoherence({
+      mtnTransactionId: params.reference,
+      userId:           user.id,
+      amount:           params.amount,
+      transactionType:  'disbursement',
+    })
+
+    if (verification.recommended_action === 'block') {
+      return { success: false, error: 'Décaissement bloqué par la sécurité.' }
+    }
+  }
+
   try {
     const response = await fetch(
       `${process.env.MTN_MOMO_BASE_URL}/disbursement/v1_0/transfer`,
@@ -94,6 +131,22 @@ export async function initiateAirtelCollection(params: {
   reference:   string
   description: string
 }): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    const verification = await verifyTransactionCoherence({
+      mtnTransactionId: params.reference,
+      userId:           user.id,
+      amount:           params.amount,
+      transactionType:  'collection',
+    })
+
+    if (verification.recommended_action === 'block') {
+      return { success: false, error: 'Transaction bloquée par la sécurité.' }
+    }
+  }
+
   const token = await getAirtelToken()
   if (!token) return { success: false, error: 'Impossible de contacter Airtel' }
 
