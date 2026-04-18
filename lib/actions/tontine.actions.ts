@@ -1,5 +1,5 @@
-import { analyzeFugitiveBehavior } from "@/lib/ai/modules/behavioral-analysis"
 'use server'
+import { analyzeFugitiveBehavior } from "@/lib/ai/modules/behavioral-analysis"
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
 import { revalidatePath } from 'next/cache'
