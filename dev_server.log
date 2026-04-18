@@ -2,18 +2,29 @@
 > likelemba@0.1.0 dev
 > next dev
 
-⚠ Port 3000 is in use by an unknown process, using available port 3001 instead.
 ▲ Next.js 16.2.2 (Turbopack)
-- Local:         http://localhost:3001
-- Network:       http://192.168.0.2:3001
-- Environments: .env.local
-✓ Ready in 1098ms
-⨯ Another next dev server is already running.
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+✓ Ready in 693ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
 
-- Local:        http://localhost:3000
-- PID:          66135
-- Dir:          /app
-- Log:          .next/dev/logs/next-development.log
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
 
-Run kill 66135 to stop it.
-[?25h
+⨯ Error: Your project's URL and Key are required to create a Supabase client!
+
+Check your Supabase project's API settings to find these values
+
+https://supabase.com/dashboard/project/_/settings/api
+    at <unknown> (https://supabase.com/dashboard/project/_/settings/api)
+    at <unknown> (https://supabase.com/dashboard/project/_/settings/api)
+    at middleware (middleware.ts:10:38)
+   8 |   let supabaseResponse = NextResponse.next({ request })
+   9 |
+> 10 |   const supabase = createServerClient(
+     |                                      ^
+  11 |     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  12 |     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  13 |     {

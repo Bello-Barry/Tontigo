@@ -1,6 +1,6 @@
 'use client'
 import { useRef, useState, useEffect } from 'react'
-import { Mic, Send, X, Loader2 } from 'lucide-react'
+import { Mic, Send, X, Loader2, Play, Pause } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { sendAudioMessage } from '@/lib/actions/chat.actions'
 import { toast } from 'react-toastify'
@@ -15,9 +15,18 @@ export function AudioRecorder({ groupId }: AudioRecorderProps) {
   const [audioUrl, setAudioUrl]       = useState<string | null>(null)
   const [duration, setDuration]       = useState(0)
   const [sending, setSending]         = useState(false)
+  const [previewPlaying, setPreviewPlaying] = useState(false)
   const mediaRecorder                 = useRef<MediaRecorder | null>(null)
   const timerRef                      = useRef<NodeJS.Timeout | null>(null)
+  const previewAudioRef               = useRef<HTMLAudioElement | null>(null)
   const chunks                        = useRef<Blob[]>([])
+
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl)
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [audioUrl])
 
   const startRecording = async () => {
     try {
@@ -84,6 +93,17 @@ export function AudioRecorder({ groupId }: AudioRecorderProps) {
     setAudioBlob(null)
     setAudioUrl(null)
     setDuration(0)
+    setPreviewPlaying(false)
+  }
+
+  const togglePreview = () => {
+    if (!previewAudioRef.current) return
+    if (previewPlaying) {
+      previewAudioRef.current.pause()
+    } else {
+      previewAudioRef.current.play()
+    }
+    setPreviewPlaying(!previewPlaying)
   }
 
   const sendAudio = async () => {
@@ -130,10 +150,24 @@ export function AudioRecorder({ groupId }: AudioRecorderProps) {
   if (audioBlob && audioUrl) {
     return (
       <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div className="w-32 h-8 flex items-center bg-slate-900 rounded-lg px-2 gap-2">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0" />
+        <button
+          onClick={togglePreview}
+          className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center shrink-0 hover:bg-slate-700 transition-colors"
+        >
+          {previewPlaying ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
+        </button>
+
+        <div className="flex flex-col min-w-[60px]">
             <span className="text-white text-[10px] font-mono tabular-nums">{formatDuration(duration)}</span>
         </div>
+
+        <audio
+          ref={previewAudioRef}
+          src={audioUrl}
+          onEnded={() => setPreviewPlaying(false)}
+          className="hidden"
+        />
+
         <button onClick={cancelAudio} className="p-1.5 text-slate-400 hover:text-red-400 transition-colors">
           <X className="w-4 h-4" />
         </button>
