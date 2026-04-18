@@ -1,58 +1,42 @@
-"use client"
-
+'use client'
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { MessageSquare, X, Send, Loader2, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { Send, MessageSquare, Trash2, X, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { format } from 'date-fns'
-import { deleteMessage } from '@/lib/actions/chat.actions'
+import { sendMessage, sendAudioMessage, deleteMessage } from '@/lib/actions/chat.actions'
 import { toast } from 'react-toastify'
+import { format } from 'date-fns'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { AudioRecorder } from './AudioRecorder'
 import { AudioPlayer } from './AudioPlayer'
-import { cn } from '@/lib/utils'
-
-interface Message {
-  id: string
-  content: string
-  message_type: 'text' | 'audio' | 'system'
-  audio_url?: string
-  audio_duration_seconds?: number
-  is_deleted: boolean
-  created_at: string
-  user_id: string
-  user?: {
-    full_name: string
-    avatar_url: string | null
-  }
-}
+import { createPortal } from 'react-dom'
+import { AudioErrorBoundary } from './AudioErrorBoundary'
 
 interface GroupChatProps {
   groupId: string
   currentUserId: string
-  currentUserProfile: { full_name: string; avatar_url: string | null }
-  members: any[]
+  currentUserProfile: any
+  members?: any[]
 }
 
 export function GroupChat({ groupId, currentUserId, currentUserProfile, members }: GroupChatProps) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [newMessage, setNewMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSending, setIsSending] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [messages, setMessages] = useState<any[]>([])
+  const [newMessage, setNewMessage] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSending, setIsSending] = useState(false)
   const [mounted, setMounted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
     return () => setMounted(false)
   }, [])
-  
-  const supabase = createClient()
 
-  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({ behavior })
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   useEffect(() => {
@@ -67,18 +51,17 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
         .eq('is_deleted', false)
         .order('created_at', { ascending: true })
         .limit(100)
-      
-      if (!error && data) {
-        setMessages(data as any)
-      }
+
+      if (error) toast.error("Impossible de charger les messages")
+      else setMessages(data || [])
       setIsLoading(false)
-      setTimeout(() => scrollToBottom('auto'), 100)
+      setTimeout(scrollToBottom, 100)
     }
 
     loadMessages()
 
     const channel = supabase
-      .channel(`group-chat-${groupId}`)
+      .channel(`chat:${groupId}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
@@ -316,16 +299,18 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
 
               {!newMessage.trim() && (
                 <div className="shrink-0">
-                  <AudioRecorder
-                  groupId={groupId}
-                  onOptimisticMessage={(msg) => {
-                    setMessages(prev => [...prev, { ...msg, user: currentUserProfile } as any])
-                    setTimeout(() => scrollToBottom(), 50)
-                  }}
-                  onReplaceOptimistic={(tempId, realMsg) => {
-                    setMessages(prev => prev.map(m => m.id === tempId ? { ...realMsg, user: currentUserProfile } as any : m))
-                  }}
-                />
+                  <AudioErrorBoundary>
+                    <AudioRecorder
+                      groupId={groupId}
+                      onOptimisticMessage={(msg) => {
+                        setMessages(prev => [...prev, { ...msg, user: currentUserProfile } as any])
+                        setTimeout(() => scrollToBottom(), 50)
+                      }}
+                      onReplaceOptimistic={(tempId, realMsg) => {
+                        setMessages(prev => prev.map(m => m.id === tempId ? { ...realMsg, user: currentUserProfile } as any : m))
+                      }}
+                    />
+                  </AudioErrorBoundary>
                 </div>
               )}
 

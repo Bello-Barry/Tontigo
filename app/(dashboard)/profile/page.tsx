@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ProfileForm } from '@/components/auth/ProfileForm'
 import { TrustScoreBadge } from '@/components/shared/TrustScoreBadge'
 import { UserBadge } from '@/components/shared/UserBadge'
+import { LogoutButton } from '@/components/auth/LogoutButton'
 import { formatDate } from '@/lib/utils/format'
 import { Shield, BarChart3 } from 'lucide-react'
 import Image from 'next/image'
@@ -121,6 +122,11 @@ export default async function ProfilPage() {
           avatar_url:    profile.avatar_url    ?? '',
         }}
       />
+
+      {/* Bouton déconnexion */}
+      <div className="pt-4 pb-12 border-t border-slate-700">
+        <LogoutButton />
+      </div>
     </div>
   )
 }

@@ -128,18 +128,35 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
     }
 
     try {
-      const supabase = createClient()
-      const fileName = `${groupId}/${Date.now()}.webm`
+      if (!audioBlob.size) {
+        toast.error('Enregistrement vide, réessaie.')
+        setSending(false)
+        return
+      }
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const supabase = createClient()
+      const fileName = `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webm`
+
+      // Upload avec timeout de 30 secondes
+      const uploadPromise = supabase.storage
         .from('voice-messages')
         .upload(fileName, audioBlob, {
-          contentType: audioBlob.type,
+          contentType: audioBlob.type || 'audio/webm',
           upsert:      false,
         })
 
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Upload timeout')), 30_000)
+      )
+
+      const { data: uploadData, error: uploadError } = await Promise.race([
+        uploadPromise,
+        timeoutPromise,
+      ]).catch(err => ({ data: null, error: { message: err.message } })) as any
+
       if (uploadError) {
-        toast.error('Erreur upload audio')
+        toast.error('Impossible d\'envoyer le fichier audio. Vérifie ta connexion.')
+        setSending(false)
         return
       }
 
@@ -158,8 +175,9 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
       }
 
       cancelAudio()
-    } catch (err) {
-      toast.error('Erreur lors de l\'envoi')
+    } catch (err: any) {
+      console.error('Audio send error:', err)
+      toast.error('Une erreur est survenue lors de l\'envoi audio.')
     } finally {
       setSending(false)
     }

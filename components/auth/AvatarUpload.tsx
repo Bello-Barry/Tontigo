@@ -21,6 +21,21 @@ export function AvatarUpload({ userId, initialUrl, onUpload }: AvatarUploadProps
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Validation immédiate côté client avant l'upload
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Image trop lourde (maximum 2 Mo)')
+      // Vider l'input pour permettre de resélectionner
+      e.target.value = ''
+      return
+    }
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!validTypes.includes(file.type)) {
+      setError('Format invalide. Utilise JPG, PNG ou WebP.')
+      e.target.value = ''
+      return
+    }
+
     // Preview local immédiat
     const reader = new FileReader()
     reader.onload = (ev) => setPreview(ev.target?.result as string)
@@ -29,23 +44,43 @@ export function AvatarUpload({ userId, initialUrl, onUpload }: AvatarUploadProps
     setLoading(true)
     setError('')
 
-    const formData = new FormData()
-    formData.append('avatar', file)
-
-    const result = await uploadAvatar(userId, formData)
-    setLoading(false)
-
-    if (result.error) {
-      setError(result.error)
+    // ── IMPORTANT : timeout de sécurité pour éviter le chargement infini ──
+    const timeoutId = setTimeout(() => {
+      setLoading(false)
       setPreview(initialUrl ?? null)
-      return
-    }
+      setError('Temps dépassé. Vérifie ta connexion et réessaie.')
+    }, 20_000)  // 20 secondes max
 
-    if (result.data) {
-      // ── Mettre à jour le store global pour que l'avatar
-      // s'affiche partout instantanément ──────────────────
-      updateAvatar(result.data.url)
-      onUpload(result.data.url)
+    try {
+      const formData = new FormData()
+      formData.append('avatar', file)
+
+      const result = await uploadAvatar(userId, formData)
+
+      clearTimeout(timeoutId)
+
+      if (result.error) {
+        setError(result.error)
+        setPreview(initialUrl ?? null)
+        return
+      }
+
+      if (result.data) {
+        // Mettre à jour le store global pour afficher partout
+        updateAvatar(result.data.url)
+        onUpload(result.data.url)
+      }
+
+    } catch (err: any) {
+      clearTimeout(timeoutId)
+      setError('Erreur lors de l\'upload. Réessaie.')
+      setPreview(initialUrl ?? null)
+      console.error('Avatar upload error:', err)
+    } finally {
+      clearTimeout(timeoutId)
+      setLoading(false)
+      // Vider l'input pour permettre de re-uploader le même fichier
+      e.target.value = ''
     }
   }
 
