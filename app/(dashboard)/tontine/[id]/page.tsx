@@ -25,6 +25,12 @@ export default async function GroupDetailPage(props: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { data: profile } = await supabase
+    .from('users')
+    .select('full_name, avatar_url')
+    .eq('id', user.id)
+    .single()
+
   // Récupérer le groupe
   const { data: group, error: groupError } = await supabase
     .from('tontine_groups')
@@ -250,7 +256,8 @@ export default async function GroupDetailPage(props: Props) {
       {/* Floating Chat */}
       <GroupChat 
         groupId={group.id} 
-        currentUserId={user.id} 
+        currentUserId={user.id}
+        currentUserProfile={{ full_name: profile?.full_name || 'Utilisateur', avatar_url: profile?.avatar_url || null }}
         members={memberships || []} 
       />
     </div>

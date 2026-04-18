@@ -30,10 +30,11 @@ interface Message {
 interface GroupChatProps {
   groupId: string
   currentUserId: string
+  currentUserProfile: { full_name: string; avatar_url: string | null }
   members: any[]
 }
 
-export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
+export function GroupChat({ groupId, currentUserId, currentUserProfile, members }: GroupChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -84,17 +85,31 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
         table: 'group_messages',
         filter: `group_id=eq.${groupId}`
       }, async (payload: any) => {
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('full_name, avatar_url')
-          .eq('id', payload.new.user_id)
-          .single()
-
-        const msgWithUser = { ...payload.new, user: userProfile } as Message
-
         setMessages((prev) => {
-          if (prev.some(m => m.id === msgWithUser.id)) return prev
-          return [...prev, msgWithUser]
+          const tempIndex = prev.findIndex(m =>
+            m.id.startsWith('temp-') &&
+            m.content === payload.new.content &&
+            m.user_id === payload.new.user_id
+          )
+
+          if (tempIndex !== -1) {
+            const updated = [...prev]
+            updated[tempIndex] = { ...payload.new, user: prev[tempIndex].user } as any
+            return updated
+          }
+
+          if (prev.some(m => m.id === payload.new.id)) return prev
+
+          // Fetch profile for others
+          const loadOtherProfile = async () => {
+             const { data } = await supabase.from('users').select('full_name, avatar_url').eq('id', payload.new.user_id).single()
+             if (data) {
+                setMessages(current => current.map(m => m.id === payload.new.id ? { ...m, user: data } as any : m))
+             }
+          }
+          loadOtherProfile()
+
+          return [...prev, payload.new as any]
         })
         setTimeout(() => scrollToBottom(), 100)
       })
@@ -115,29 +130,43 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
     }
   }, [isOpen, groupId, supabase])
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
+    const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
-    if (!newMessage.trim() || isSending) return
+    const trimmed = newMessage.trim()
+    if (!trimmed || isSending) return
 
-    const content = newMessage.trim()
     setNewMessage('')
     setIsSending(true)
+
+    const tempId = `temp-${Date.now()}-${Math.random()}`
+    const optimisticMessage = {
+      id: tempId,
+      content: trimmed,
+      message_type: 'text',
+      is_deleted: false,
+      created_at: new Date().toISOString(),
+      user_id: currentUserId,
+      user: currentUserProfile,
+    }
+
+    setMessages(prev => [...prev, optimisticMessage as any])
+    setTimeout(() => scrollToBottom(), 50)
 
     const { error } = await supabase
       .from('group_messages')
       .insert({
         group_id: groupId,
         user_id: currentUserId,
-        content: content,
+        content: trimmed,
         message_type: 'text'
       })
 
     if (error) {
-      toast.error('Erreur lors de l\'envoi')
-      setNewMessage(content)
+      toast.error("Erreur lors de l'envoi")
+      setMessages(prev => prev.filter(m => m.id !== tempId))
+      setNewMessage(trimmed)
     }
     setIsSending(false)
-    setTimeout(() => scrollToBottom(), 100)
   }
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -244,7 +273,7 @@ export function GroupChat({ groupId, currentUserId, members }: GroupChatProps) {
                           )}
                         >
                           {msg.message_type === 'audio' ? (
-                            <AudioPlayer url={msg.audio_url!} duration={msg.audio_duration_seconds!} />
+                            <AudioPlayer url={msg.audio_url!} duration={msg.audio_duration_seconds!} isOwn={isMe} />
                           ) : (
                             <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                           )}

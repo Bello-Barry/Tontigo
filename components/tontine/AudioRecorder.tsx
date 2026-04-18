@@ -1,6 +1,6 @@
 'use client'
-import { useRef, useState } from 'react'
-import { Mic, MicOff, Send, X, Loader2 } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { Mic, Send, X, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { sendAudioMessage } from '@/lib/actions/chat.actions'
 import { toast } from 'react-toastify'
@@ -71,6 +71,14 @@ export function AudioRecorder({ groupId }: AudioRecorderProps) {
     setRecording(false)
   }
 
+  const handleMicClick = async () => {
+    if (recording) {
+      stopRecording()
+    } else {
+      await startRecording()
+    }
+  }
+
   const cancelAudio = () => {
     if (audioUrl) URL.revokeObjectURL(audioUrl)
     setAudioBlob(null)
@@ -122,8 +130,10 @@ export function AudioRecorder({ groupId }: AudioRecorderProps) {
   if (audioBlob && audioUrl) {
     return (
       <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <audio src={audioUrl} controls className="h-8 w-32" />
-        <span className="text-slate-400 text-[10px] shrink-0 font-medium">{formatDuration(duration)}</span>
+        <div className="w-32 h-8 flex items-center bg-slate-900 rounded-lg px-2 gap-2">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0" />
+            <span className="text-white text-[10px] font-mono tabular-nums">{formatDuration(duration)}</span>
+        </div>
         <button onClick={cancelAudio} className="p-1.5 text-slate-400 hover:text-red-400 transition-colors">
           <X className="w-4 h-4" />
         </button>
@@ -140,22 +150,24 @@ export function AudioRecorder({ groupId }: AudioRecorderProps) {
 
   return (
     <button
-      onPointerDown={startRecording}
-      onPointerUp={stopRecording}
-      onPointerLeave={stopRecording}
+      onClick={handleMicClick}
       className={`
-        p-2.5 rounded-xl transition-all select-none
+        p-2.5 rounded-xl transition-all select-none flex items-center gap-2
         ${recording
-          ? 'bg-red-500 scale-110 shadow-lg shadow-red-500/50 animate-pulse'
+          ? 'bg-red-500 shadow-lg shadow-red-500/40 animate-pulse'
           : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-emerald-400'
         }
       `}
-      title={recording ? `Enregistrement... ${formatDuration(duration)}` : 'Maintenir pour enregistrer'}
+      title={recording ? `Arrêter (${formatDuration(duration)})` : 'Enregistrer un message vocal'}
     >
-      {recording
-        ? <MicOff className="w-5 h-5 text-white" />
-        : <Mic className="w-5 h-5" />
-      }
+      {recording ? (
+        <>
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+            <span className="text-white text-xs font-mono tabular-nums">{formatDuration(duration)}</span>
+        </>
+      ) : (
+        <Mic className="w-5 h-5" />
+      )}
     </button>
   )
 }
