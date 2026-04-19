@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     // Clean messages to ensure they match CoreMessage schema
     const coreMessages = messages.map((m: any) => {
       let content = m.content || ''
-      
+
       // If content is missing but parts exist (modern SDK structure), construct it
       if (!content && m.parts && Array.isArray(m.parts)) {
         content = m.parts

@@ -4,9 +4,8 @@ import "./globals.css";
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
-import Script from "next/script";
-
 import { ThemeProvider } from "@/components/shared/ThemeProvider"
+import { ServiceWorkerRegister } from "@/components/shared/ServiceWorkerRegister"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,6 +48,16 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              var theme = localStorage.getItem('theme') || 'dark';
+              document.documentElement.classList.add(theme);
+            })();
+          `
+        }} />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-300">
         <ThemeProvider
           attribute="class"
@@ -56,16 +65,8 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ServiceWorkerRegister />
           {children}
-          <Script id="sw-registration" strategy="afterInteractive">
-            {`
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js');
-                });
-              }
-            `}
-          </Script>
           <ToastContainer
             position="top-right"
             autoClose={4000}

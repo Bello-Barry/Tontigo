@@ -142,7 +142,7 @@ export function OnboardingForm({ userId }: OnboardingFormProps) {
             <p className="text-slate-400 text-sm mt-1">Ton identité sur Likelemba</p>
           </div>
 
-          <AvatarUpload userId={userId} onUpload={setAvatarUrl} />
+          <AvatarUpload userId={userId} onUpload={setAvatarUrl} initialUrl={null} />
 
           <div className="space-y-2">
             <Label className="text-slate-300">Nom complet *</Label>

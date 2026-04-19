@@ -6,8 +6,10 @@ import { UserBadge } from '@/components/shared/UserBadge'
 import { TrustScoreBadge } from '@/components/shared/TrustScoreBadge'
 import { isProfileComplete } from '@/lib/utils/onboarding'
 import Link from 'next/link'
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { AICoach } from '@/components/ui/AICoach'
+import { ProfileHeaderAvatar } from '@/components/shared/ProfileHeaderAvatar'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient()
@@ -32,7 +34,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {/* Header (Topbar) */}
         <header className="h-16 border-b bg-card/50 backdrop-blur flex items-center justify-between px-4 md:px-8 z-10">
           <div className="md:hidden flex items-center gap-2">
-             <img src="/logo.png" alt="Logo" className="w-8 h-8" />
+             <Image src="/logo.png" alt="Logo" width={32} height={32} className="w-8 h-8" />
              <h1 className="text-xl font-bold text-primary">Likelemba</h1>
           </div>
           
@@ -45,13 +47,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <AICoach />
             <NotificationBell />
             <Link href="/profile">
-              <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center overflow-hidden">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xs font-medium uppercase">{profile?.full_name?.substring(0, 2) || 'UU'}</span>
-                )}
-              </div>
+              <ProfileHeaderAvatar initialProfile={profile} />
             </Link>
           </div>
         </header>

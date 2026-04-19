@@ -2,9 +2,10 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { TrustScoreBadge } from '@/components/shared/TrustScoreBadge'
 import { formatFCFA } from '@/lib/utils/format'
-import { Users, Target, Activity, ArrowRight } from 'lucide-react'
+import { Users, Target, Activity, ArrowRight, Wallet, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { getWalletData } from '@/lib/actions/wallet.actions'
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
@@ -12,6 +13,10 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase.from('users').select('*').eq('id', user!.id).single()
   
+  // Portefeuille
+  const walletResult = await getWalletData()
+  const walletData = walletResult.data?.wallet
+
   // Statistiques rapides
   const { count: activeGroups } = await supabase
     .from('memberships')
@@ -25,10 +30,10 @@ export default async function DashboardPage() {
     .eq('user_id', user!.id)
     .eq('status', 'actif')
 
-  const totalSavings = myVaults?.reduce((acc, vault) => acc + vault.current_balance, 0) || 0
+  const totalSavings = myVaults?.reduce((acc, vault) => acc + Number(vault.current_balance), 0) || 0
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Bonjour, {profile?.full_name?.split(' ')[0]} 👋</h2>
@@ -39,6 +44,30 @@ export default async function DashboardPage() {
            <TrustScoreBadge score={profile?.trust_score || 50} />
         </div>
       </div>
+
+      {/* Widget Portefeuille */}
+      {walletData && Number(walletData.total_balance) > 0 && (
+        <Link href="/portefeuille">
+          <div className="glass-card p-4 border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs">💰 Disponible pour retrait</p>
+                  <p className="text-emerald-400 font-bold text-xl mt-0.5">
+                    {formatFCFA(walletData.total_balance)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-emerald-400 text-sm font-medium">
+                Retirer <ChevronRight className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+        </Link>
+      )}
 
       {/* Cartes de synthèse */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
