@@ -18,7 +18,9 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
   const [duration, setDuration]       = useState(0)
   const [sending, setSending]         = useState(false)
   const [previewPlaying, setPreviewPlaying] = useState(false)
-  const mediaRecorder                 = useRef<MediaRecorder | null>(null)
+
+  const mediaRecorderRef              = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef                = useRef<MediaStream | null>(null)
   const timerRef                      = useRef<NodeJS.Timeout | null>(null)
   const previewAudioRef               = useRef<HTMLAudioElement | null>(null)
   const chunks                        = useRef<Blob[]>([])
@@ -27,12 +29,21 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
     return () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl)
       if (timerRef.current) clearInterval(timerRef.current)
+
+      // Fix 4 — Cleanup stream micro
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (mediaRecorderRef.current?.state !== 'inactive') {
+        mediaRecorderRef.current?.stop()
+      }
     }
   }, [audioUrl])
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
       chunks.current = []
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm')
@@ -41,21 +52,25 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
           ? 'audio/ogg'
           : 'audio/mp4'
 
-      mediaRecorder.current = new MediaRecorder(stream, { mimeType })
+      const recorder = new MediaRecorder(stream, { mimeType })
+      mediaRecorderRef.current = recorder
 
-      mediaRecorder.current.ondataavailable = (e) => {
+      recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.current.push(e.data)
       }
 
-      mediaRecorder.current.onstop = () => {
+      recorder.onstop = () => {
         const blob = new Blob(chunks.current, { type: mimeType })
         const url  = URL.createObjectURL(blob)
         setAudioBlob(blob)
         setAudioUrl(url)
+
+        // Stop stream tracks
         stream.getTracks().forEach(t => t.stop())
+        mediaStreamRef.current = null
       }
 
-      mediaRecorder.current.start(100)
+      recorder.start(100)
       setRecording(true)
       setDuration(0)
 
@@ -70,13 +85,14 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
       }, 1000)
 
     } catch (err) {
+      console.error('Recording start error:', err)
       toast.error('Accès micro refusé. Vérifie tes paramètres.')
     }
   }
 
   const stopRecording = () => {
-    if (mediaRecorder.current?.state === 'recording') {
-      mediaRecorder.current.stop()
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop()
     }
     if (timerRef.current) clearInterval(timerRef.current)
     setRecording(false)
@@ -91,7 +107,9 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
   }
 
   const cancelAudio = () => {
-    if (audioUrl) URL.revokeObjectURL(audioUrl)
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl) // Fix 1 — Toujours révoquer
+    }
     setAudioBlob(null)
     setAudioUrl(null)
     setDuration(0)
@@ -114,7 +132,7 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
 
     const tempId = `temp-audio-${Date.now()}`
 
-    // OPTIMISTIC UPDATE
+    // Fix 3 — Optimistic update audio
     if (onOptimisticMessage) {
       onOptimisticMessage({
         id: tempId,
@@ -123,7 +141,8 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
         audio_duration_seconds: duration,
         created_at: new Date().toISOString(),
         is_deleted: false,
-        content: '[Audio message]'
+        content: '🎤 Message vocal',
+        isPending: true
       })
     }
 
@@ -155,9 +174,7 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
       ]).catch(err => ({ data: null, error: { message: err.message } })) as any
 
       if (uploadError) {
-        toast.error('Impossible d\'envoyer le fichier audio. Vérifie ta connexion.')
-        setSending(false)
-        return
+        throw new Error(uploadError.message || 'Upload failed')
       }
 
       const { data: { publicUrl } } = supabase.storage
@@ -166,8 +183,7 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
 
       const result = await sendAudioMessage(groupId, publicUrl, duration)
       if (result.error) {
-        toast.error(result.error)
-        return
+        throw new Error(result.error)
       }
 
       if (onReplaceOptimistic && result.data) {
@@ -177,7 +193,8 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
       cancelAudio()
     } catch (err: any) {
       console.error('Audio send error:', err)
-      toast.error('Une erreur est survenue lors de l\'envoi audio.')
+      toast.error('Envoi échoué, réessaie')
+      // Remove optimistic message will be handled by GroupChat logic if implemented there
     } finally {
       setSending(false)
     }

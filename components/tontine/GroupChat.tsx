@@ -39,8 +39,10 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  // Fix 2 — Realtime + isMounted dans le composant chat groupe
   useEffect(() => {
     if (!isOpen) return
+    let isMounted = true
 
     const loadMessages = async () => {
       setIsLoading(true)
@@ -52,10 +54,15 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
         .order('created_at', { ascending: true })
         .limit(100)
 
-      if (error) toast.error("Impossible de charger les messages")
-      else setMessages(data || [])
-      setIsLoading(false)
-      setTimeout(scrollToBottom, 100)
+      if (error) {
+        if (isMounted) toast.error("Impossible de charger les messages")
+      } else {
+        if (isMounted) setMessages(data || [])
+      }
+      if (isMounted) {
+        setIsLoading(false)
+        setTimeout(scrollToBottom, 100)
+      }
     }
 
     loadMessages()
@@ -68,10 +75,15 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
         table: 'group_messages',
         filter: `group_id=eq.${groupId}`
       }, async (payload: any) => {
+        if (!isMounted) return
         setMessages((prev) => {
+          // Si message existe déjà (optimistic update ou doublon realtime)
+          const exists = prev.some(m => m.id === payload.new.id)
+          if (exists) return prev
+
           const tempIndex = prev.findIndex(m =>
             m.id.startsWith('temp-') &&
-            m.content === payload.new.content &&
+            (m.content === payload.new.content || (m.message_type === 'audio' && payload.new.message_type === 'audio')) &&
             m.user_id === payload.new.user_id
           )
 
@@ -81,12 +93,10 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
             return updated
           }
 
-          if (prev.some(m => m.id === payload.new.id)) return prev
-
           // Fetch profile for others
           const loadOtherProfile = async () => {
              const { data } = await supabase.from('users').select('full_name, avatar_url').eq('id', payload.new.user_id).single()
-             if (data) {
+             if (data && isMounted) {
                 setMessages(current => current.map(m => m.id === payload.new.id ? { ...m, user: data } as any : m))
              }
           }
@@ -102,6 +112,7 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
         table: 'group_messages',
         filter: `group_id=eq.${groupId}`
       }, (payload: any) => {
+        if (!isMounted) return
         if (payload.new.is_deleted) {
           setMessages(prev => prev.filter(m => m.id !== payload.new.id))
         }
@@ -109,6 +120,7 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
       .subscribe()
 
     return () => {
+      isMounted = false
       supabase.removeChannel(channel)
     }
   }, [isOpen, groupId, supabase])
@@ -130,26 +142,33 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
       created_at: new Date().toISOString(),
       user_id: currentUserId,
       user: currentUserProfile,
+      isPending: true
     }
 
     setMessages(prev => [...prev, optimisticMessage as any])
     setTimeout(() => scrollToBottom(), 50)
 
-    const { error } = await supabase
-      .from('group_messages')
-      .insert({
-        group_id: groupId,
-        user_id: currentUserId,
-        content: trimmed,
-        message_type: 'text'
-      })
+    try {
+      const { error } = await supabase
+        .from('group_messages')
+        .insert({
+          group_id: groupId,
+          user_id: currentUserId,
+          content: trimmed,
+          message_type: 'text'
+        })
 
-    if (error) {
+      if (error) {
+        toast.error("Erreur lors de l'envoi")
+        setMessages(prev => prev.filter(m => m.id !== tempId))
+        setNewMessage(trimmed)
+      }
+    } catch (err) {
       toast.error("Erreur lors de l'envoi")
       setMessages(prev => prev.filter(m => m.id !== tempId))
-      setNewMessage(trimmed)
+    } finally {
+      setIsSending(false)
     }
-    setIsSending(false)
   }
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -252,7 +271,8 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
                             "px-3 py-2 rounded-2xl text-sm shadow-sm",
                             isMe
                               ? 'bg-emerald-600 text-white rounded-br-sm'
-                              : 'bg-slate-800 text-slate-100 rounded-bl-sm border border-slate-700'
+                              : 'bg-slate-800 text-slate-100 rounded-bl-sm border border-slate-700',
+                            msg.isPending && "opacity-70"
                           )}
                         >
                           {msg.message_type === 'audio' ? (
@@ -262,7 +282,7 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
                           )}
                         </div>
 
-                        {isMe && (
+                        {isMe && !msg.isPending && (
                           <button
                             onClick={() => handleDeleteMessage(msg.id)}
                             className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-slate-900 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
@@ -273,7 +293,7 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
                       </div>
                       <span className="text-[9px] text-slate-500 px-1">
                         {format(new Date(msg.created_at), 'HH:mm')}
-                        {isMe && ' ✓'}
+                        {isMe && (msg.isPending ? ' ...' : ' ✓')}
                       </span>
                     </div>
                   </div>
@@ -307,7 +327,7 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
                         setTimeout(() => scrollToBottom(), 50)
                       }}
                       onReplaceOptimistic={(tempId, realMsg) => {
-                        setMessages(prev => prev.map(m => m.id === tempId ? { ...realMsg, user: currentUserProfile } as any : m))
+                        setMessages(prev => prev.map(m => m.id === tempId ? { ...realMsg, user: currentUserProfile, isPending: false } as any : m))
                       }}
                     />
                   </AudioErrorBoundary>

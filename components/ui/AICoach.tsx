@@ -1,123 +1,138 @@
-"use client"
-
+'use client'
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
-
-import {
-  Send,
-  Bot,
-  User,
-  History,
-  X,
-  Plus,
-  Trash2,
-  MessageSquare,
-  Loader2,
-  AlertCircle,
-  ChevronLeft
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
-import {
-  saveAIConversation,
-  getAIConversations,
-  loadAIConversation,
-  deleteAIConversation,
-  deleteAllAIConversations,
-  AIConversation
-} from '@/lib/actions/ia.actions'
-import { toast } from 'react-toastify'
+import { Bot, X, Send, Loader2, MessageSquare, History, User, Trash2, Plus, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { createPortal } from 'react-dom'
+import { toast } from 'react-toastify'
+import { MarkdownMessage } from '@/components/ia/MarkdownMessage'
+
+interface Message {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+}
+
+interface Conversation {
+  id: string
+  title: string
+  updated_at: string
+}
 
 export function AICoach() {
   const [isOpen, setIsOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const [view, setView] = useState<'chat' | 'history'>('chat')
-  const [conversations, setConversations] = useState<AIConversation[]>([])
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
   const [chatInput, setChatInput] = useState('')
-  const [isInitializing, setIsInitializing] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(false)
+  const [view, setView] = useState<'chat' | 'history'>('chat')
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setMounted(true)
     return () => setMounted(false)
   }, [])
 
-  const supabase = createClient()
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [messages, setMessages] = useState<any[]>([])
-
-
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUserId(user?.id || null)
-      setIsInitializing(false)
-    }
-    getUser()
-  }, [])
-
   useEffect(() => {
     if (isOpen) {
-      setView('chat')
-      refreshConversations()
-      setTimeout(() => inputRef.current?.focus(), 150)
+      loadConversations()
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+      }
     }
   }, [isOpen])
 
-  const refreshConversations = async () => {
-    const result = await getAIConversations()
-    if (result.data) {
-      setConversations(result.data)
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, isLoading])
+
+  const loadConversations = async () => {
+    try {
+      const response = await fetch('/api/ia/conversations')
+      if (response.ok) {
+        const data = await response.json()
+        setConversations(data)
+      }
+    } catch (err) {
+      console.error('Failed to load conversations')
     }
   }
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const selectConversation = async (id: string) => {
+    setIsLoading(true)
+    setActiveConversationId(id)
+    setView('chat')
+    try {
+      const response = await fetch(`/api/ia/conversations/${id}/messages`)
+      if (response.ok) {
+        const data = await response.json()
+        setMessages(data)
+      }
+    } catch (err) {
+      toast.error('Erreur lors du chargement de la discussion')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+  const startNewConversation = () => {
+    setActiveConversationId(null)
+    setMessages([])
+    setView('chat')
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
 
-    const handleCustomSubmit = async (e: React.FormEvent) => {
+  const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const trimmed = chatInput.trim()
-    if (!trimmed || isLoading) return
+    if (!chatInput.trim() || isLoading) return
 
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: chatInput,
+      created_at: new Date().toISOString()
+    }
+
+    setMessages(prev => [...prev, userMessage])
     setChatInput('')
     setIsLoading(true)
-    setError(null)
-
-    const userMsg = { id: Date.now().toString(), role: 'user', content: trimmed }
-    const newHistory = [...messages, userMsg]
-    setMessages(newHistory)
-
-    const streamingMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: '' }
-    setMessages([...newHistory, streamingMsg])
+    setError(false)
 
     try {
       const response = await fetch('/api/ia/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: trimmed,
-          history: messages.map((m: any) => ({ role: m.role, content: m.content || '' })),
-          conversationId: activeConversationId,
-        }),
+          message: userMessage.content,
+          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+          conversationId: activeConversationId
+        })
       })
 
-      if (!response.ok) throw new Error('Erreur API IA')
+      if (!response.ok) throw new Error('Stream failed')
 
-      const reader = response.body!.getReader()
-      const decoder = new TextDecoder()
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No reader')
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: '',
+        created_at: new Date().toISOString()
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+
       let fullText = ''
+      const decoder = new TextDecoder()
 
       while (true) {
         const { done, value } = await reader.read()
@@ -126,110 +141,84 @@ export function AICoach() {
         const chunk = decoder.decode(value, { stream: true })
         fullText += chunk
 
-        setMessages(prev => {
-          const updated = [...prev]
-          const lastIndex = updated.length - 1
-          if (updated[lastIndex].role === 'assistant') {
-            updated[lastIndex] = { ...updated[lastIndex], content: fullText }
-          }
-          return updated
-        })
-
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        setMessages(prev => prev.map(m =>
+          m.id === assistantMessage.id ? { ...m, content: fullText } : m
+        ))
       }
 
-      refreshConversations()
+      // Refresh conversations in background to update titles/dates
+      loadConversations()
 
-    } catch (err: any) {
-      setError(err.message)
-      toast.error("L'IA est momentanément indisponible.")
+    } catch (err) {
+      console.error('IA Coach Error:', err)
+      setError(true)
+      toast.error('Le Coach est momentanément indisponible.')
     } finally {
       setIsLoading(false)
-      setTimeout(() => inputRef.current?.focus(), 50)
-    }
-  }
-  const startNewConversation = () => {
-    setActiveConversationId(null)
-    setMessages([])
-    setView('chat')
-    setTimeout(() => inputRef.current?.focus(), 50)
-  }
-
-  const selectConversation = async (id: string) => {
-    const result = await loadAIConversation(id)
-    if (result.data) {
-      setMessages(result.data.messages.map((m, i) => ({
-        ...m,
-        id: i.toString(),
-        parts: [{ type: 'text', text: m.content }]
-      })) as any)
-      setActiveConversationId(id)
-      setView('chat')
-    } else {
-      toast.error(result.error || 'Erreur chargement conversation')
     }
   }
 
   const handleDeleteConversation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    if (!confirm('Supprimer cette conversation ?')) return
-    const result = await deleteAIConversation(id)
-    if (result.success) {
-      setConversations(prev => prev.filter(c => c.id !== id))
-      if (activeConversationId === id) {
-        startNewConversation()
+    if (!confirm('Supprimer cette discussion ?')) return
+
+    try {
+      const response = await fetch(`/api/ia/conversations/${id}`, { method: 'DELETE' })
+      if (response.ok) {
+        setConversations(prev => prev.filter(c => c.id !== id))
+        if (activeConversationId === id) startNewConversation()
+        toast.success('Discussion supprimée')
       }
+    } catch (err) {
+      toast.error('Erreur lors de la suppression')
     }
   }
 
   const handleDeleteAll = async () => {
-    if (!confirm('Tout supprimer ?')) return
-    const result = await deleteAllAIConversations()
-    if (result.success) {
-      setConversations([])
-      startNewConversation()
+    if (!confirm('Supprimer TOUT l\'historique ?')) return
+    try {
+      const response = await fetch('/api/ia/conversations', { method: 'DELETE' })
+      if (response.ok) {
+        setConversations([])
+        startNewConversation()
+        toast.success('Historique effacé')
+      }
+    } catch (err) {
+      toast.error('Erreur lors de l\'effacement')
     }
   }
 
-  const renderMessageContent = (m: any) => {
-    if (m.parts && Array.isArray(m.parts)) {
-      return m.parts
-        .map((part: any) => (part.type === 'text' ? part.text : ''))
-        .join('')
+  const renderMessageContent = (m: Message) => {
+    if (m.role === 'assistant') {
+      return <MarkdownMessage content={m.content} />
     }
-    return m.content || ''
+    return <p className="whitespace-pre-wrap break-words">{m.content}</p>
   }
 
   return (
     <>
       <Button
+        onClick={() => setIsOpen(true)}
         variant="ghost"
         size="icon"
-        onClick={() => setIsOpen(true)}
-        className="relative text-slate-400 hover:text-emerald-400 transition-colors"
-        aria-label="Coach Likelemba"
+        className="relative w-10 h-10 rounded-full bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-500 border border-emerald-500/20 shadow-sm"
       >
-        <Bot size={22} />
-        <span className="absolute -top-1 -right-1 flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
+        <Bot className="w-5 h-5" />
       </Button>
 
       {isOpen && mounted && createPortal(
         <div
           className={cn(
-            "fixed z-[100] flex flex-col bg-slate-950 border-none outline-none overflow-hidden shadow-2xl",
+            "fixed z-[100] flex flex-col bg-slate-950 shadow-2xl transition-all duration-300 border-none outline-none overflow-hidden",
             "inset-0 top-0 left-0 w-full h-full rounded-none",
-            "md:inset-auto md:bottom-4 md:right-4 md:left-auto md:top-auto md:w-[384px] md:h-[600px] md:rounded-2xl md:border md:border-slate-800"
+            "md:inset-auto md:bottom-4 md:right-4 md:w-[400px] md:h-[600px] md:rounded-2xl md:border md:border-slate-800"
           )}
         >
-          {/* Header */}
           <div className="p-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0 h-16">
             <div className="flex items-center gap-3">
               {view === 'history' ? (
                 <Button variant="ghost" size="icon" onClick={() => setView('chat')} className="text-slate-400">
-                  <ChevronLeft className="w-5 h-5" />
+                   <Plus className="w-5 h-5 rotate-45" />
                 </Button>
               ) : (
                 <Button variant="ghost" size="icon" onClick={() => setView('history')} className="text-slate-400">
@@ -306,17 +295,15 @@ export function AICoach() {
                         ? "bg-emerald-600/10 text-emerald-50 border border-emerald-600/20 rounded-tr-none"
                         : "bg-slate-900 text-slate-200 border border-slate-800 rounded-tl-none"
                     )}>
-                      <span className="whitespace-pre-wrap break-words">
-                        {renderMessageContent(m)}
-                        {isLoading && m.role === 'assistant' && m === messages[messages.length - 1] && (
-                          <span className="inline-block w-1 h-4 bg-emerald-500 ml-1 animate-pulse align-middle" />
-                        )}
-                      </span>
+                      {renderMessageContent(m)}
+                      {isLoading && m.role === 'assistant' && m === messages[messages.length - 1] && (
+                        <span className="inline-block w-1 h-4 bg-emerald-500 ml-1 animate-pulse align-middle" />
+                      )}
                     </div>
                   </div>
                 ))}
 
-                {isLoading && (
+                {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                   <div className="flex gap-3">
                     <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm">
                       <Bot size={14} />
