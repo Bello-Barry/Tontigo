@@ -95,7 +95,8 @@ export async function POST(req: Request) {
       max_tokens:  800,
       temperature: 0.75,
 
-      onFinish: async ({ text: fullReply }) => {
+      onFinish: async (event: any) => {
+        const fullReply = event?.text
         if (!fullReply?.trim()) return
 
         try {
