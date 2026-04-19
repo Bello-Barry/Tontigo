@@ -58,52 +58,33 @@ export async function sendAudioMessage(
   audioUrl:        string,
   durationSeconds: number
 ): Promise<ActionResult<{ id: string }>> {
-
-  if (!groupId)                         return { error: 'groupId manquant' }
-  if (!audioUrl)                        return { error: 'audioUrl manquant' }
-  if (!audioUrl.startsWith('https://')) return { error: 'URL audio invalide' }
-  if (durationSeconds < 0)              return { error: 'Durée invalide' }
+  // Use the logic provided in the prompt but as a server action
+  if (!groupId || !audioUrl) return { error: 'Paramètres invalides' }
 
   try {
     const supabase = await createServerSupabaseClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) return { error: 'Non authentifié' }
-
-    const { data: membership } = await serviceClient
-      .from('memberships')
-      .select('id, status')
-      .eq('group_id', groupId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (!membership)               return { error: 'Tu n\'est pas membre de ce groupe' }
-    if (membership.status !== 'actif') return { error: 'Ton membership n\'est plus actif' }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Non authentifié' }
 
     const { data, error } = await serviceClient
       .from('group_messages')
       .insert({
-        group_id:               groupId,
-        user_id:                user.id,
-        content:                '🎤 Message vocal',
-        message_type:           'audio',
-        audio_url:              audioUrl,
-        audio_duration_seconds: Math.round(Math.max(0, durationSeconds)),
-        is_deleted:             false,
+        group_id:                groupId,
+        user_id:                 user.id,
+        content:                 '🎤 Message vocal',
+        message_type:            'audio',
+        audio_url:               audioUrl,
+        audio_duration_seconds:  Math.round(durationSeconds),
       })
       .select('id')
       .single()
 
-    if (error) {
-      console.error('sendAudioMessage DB error:', error)
-      return { error: `Erreur base de données: ${error.message}` }
-    }
-
+    if (error) return { error: error.message }
     return { data: { id: data.id }, success: true }
 
-  } catch (error: any) {
-    console.error('sendAudioMessage unexpected error:', error?.message)
-    return { error: 'Erreur inattendue lors de l\'envoi' }
+  } catch (err: any) {
+    console.error('sendAudioMessage error:', err)
+    return { error: 'Erreur lors de l\'envoi du message vocal' }
   }
 }
 

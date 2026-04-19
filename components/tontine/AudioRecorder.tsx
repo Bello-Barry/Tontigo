@@ -30,7 +30,6 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
       if (audioUrl) URL.revokeObjectURL(audioUrl)
       if (timerRef.current) clearInterval(timerRef.current)
 
-      // Fix 4 — Cleanup stream micro
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop())
       }
@@ -65,7 +64,6 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
         setAudioBlob(blob)
         setAudioUrl(url)
 
-        // Stop stream tracks
         stream.getTracks().forEach(t => t.stop())
         mediaStreamRef.current = null
       }
@@ -108,7 +106,7 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
 
   const cancelAudio = () => {
     if (audioUrl) {
-      URL.revokeObjectURL(audioUrl) // Fix 1 — Toujours révoquer
+      URL.revokeObjectURL(audioUrl)
     }
     setAudioBlob(null)
     setAudioUrl(null)
@@ -132,12 +130,11 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
 
     const tempId = `temp-audio-${Date.now()}`
 
-    // Fix 3 — Optimistic update audio
     if (onOptimisticMessage) {
       onOptimisticMessage({
         id: tempId,
         message_type: 'audio',
-        audio_url: audioUrl, // local preview
+        audio_url: audioUrl,
         audio_duration_seconds: duration,
         created_at: new Date().toISOString(),
         is_deleted: false,
@@ -154,24 +151,14 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
       }
 
       const supabase = createClient()
-      const fileName = `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webm`
+      const fileName = `${groupId}/${Date.now()}.webm`
 
-      // Upload avec timeout de 30 secondes
-      const uploadPromise = supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('voice-messages')
         .upload(fileName, audioBlob, {
           contentType: audioBlob.type || 'audio/webm',
           upsert:      false,
         })
-
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Upload timeout')), 30_000)
-      )
-
-      const { data: uploadData, error: uploadError } = await Promise.race([
-        uploadPromise,
-        timeoutPromise,
-      ]).catch(err => ({ data: null, error: { message: err.message } })) as any
 
       if (uploadError) {
         throw new Error(uploadError.message || 'Upload failed')
@@ -194,9 +181,9 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
     } catch (err: any) {
       console.error('Audio send error:', err)
       toast.error('Envoi échoué, réessaie')
-      // Remove optimistic message will be handled by GroupChat logic if implemented there
     } finally {
       setSending(false)
+      if (audioUrl) URL.revokeObjectURL(audioUrl)
     }
   }
 
@@ -205,10 +192,10 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
 
   if (audioBlob && audioUrl) {
     return (
-      <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5">
         <button
           onClick={togglePreview}
-          className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center shrink-0 hover:bg-slate-700 transition-colors"
+          className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center hover:bg-slate-700"
         >
           {previewPlaying ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
         </button>
@@ -224,13 +211,13 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
           className="hidden"
         />
 
-        <button onClick={cancelAudio} className="p-1.5 text-slate-400 hover:text-red-400 transition-colors">
+        <button onClick={cancelAudio} className="p-1.5 text-slate-400 hover:text-red-400">
           <X className="w-4 h-4" />
         </button>
         <button
           onClick={sendAudio}
           disabled={sending}
-          className="p-2 bg-emerald-600 rounded-lg hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-lg shadow-emerald-900/20"
+          className="p-2 bg-emerald-600 rounded-lg hover:bg-emerald-500 disabled:opacity-50"
         >
           {sending ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" /> : <Send className="w-3.5 h-3.5 text-white" />}
         </button>
@@ -244,16 +231,15 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
       className={`
         p-2.5 rounded-xl transition-all select-none flex items-center gap-2
         ${recording
-          ? 'bg-red-500 shadow-lg shadow-red-500/40 animate-pulse'
+          ? 'bg-red-500 animate-pulse'
           : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-emerald-400'
         }
       `}
-      title={recording ? `Arrêter (${formatDuration(duration)})` : 'Enregistrer un message vocal'}
     >
       {recording ? (
         <>
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-            <span className="text-white text-xs font-mono tabular-nums">{formatDuration(duration)}</span>
+            <div className="w-2 h-2 bg-white rounded-full" />
+            <span className="text-white text-xs font-mono">{formatDuration(duration)}</span>
         </>
       ) : (
         <Mic className="w-5 h-5" />

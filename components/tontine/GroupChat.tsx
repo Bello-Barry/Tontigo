@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import { AudioRecorder } from './AudioRecorder'
 import { AudioPlayer } from './AudioPlayer'
 import { createPortal } from 'react-dom'
-import { AudioErrorBoundary } from './AudioErrorBoundary'
 
 interface GroupChatProps {
   groupId: string
@@ -39,7 +38,6 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // Fix 2 — Realtime + isMounted dans le composant chat groupe
   useEffect(() => {
     if (!isOpen) return
     let isMounted = true
@@ -77,7 +75,6 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
       }, async (payload: any) => {
         if (!isMounted) return
         setMessages((prev) => {
-          // Si message existe déjà (optimistic update ou doublon realtime)
           const exists = prev.some(m => m.id === payload.new.id)
           if (exists) return prev
 
@@ -93,7 +90,6 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
             return updated
           }
 
-          // Fetch profile for others
           const loadOtherProfile = async () => {
              const { data } = await supabase.from('users').select('full_name, avatar_url').eq('id', payload.new.user_id).single()
              if (data && isMounted) {
@@ -211,13 +207,10 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
         <div
           className={cn(
             "fixed z-[100] flex flex-col bg-slate-950 border-none outline-none overflow-hidden shadow-2xl",
-            // Mobile style
             "inset-0 top-0 left-0 w-full h-full rounded-none",
-            // Desktop style
-            "md:inset-auto md:bottom-4 md:right-4 md:left-auto md:top-auto md:w-[384px] md:h-[600px] md:rounded-2xl md:border md:border-slate-800"
+            "md:inset-auto md:bottom-4 md:right-4 md:w-[384px] md:h-[600px] md:rounded-2xl md:border md:border-slate-800"
           )}
         >
-          {/* Header */}
           <div className="p-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0 h-16">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-emerald-500" />
@@ -228,7 +221,6 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
             </Button>
           </div>
 
-          {/* Message List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 scrollbar-hide">
             {isLoading ? (
               <div className="flex items-center justify-center h-full text-slate-500">
@@ -303,7 +295,6 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
             <div ref={messagesEndRef} className="h-2" />
           </div>
 
-          {/* Input Area */}
           <div className="p-3 border-t border-slate-800 bg-slate-900 shrink-0 min-h-[70px]">
             <div className="flex items-end gap-2 max-w-full">
               <textarea
@@ -313,24 +304,22 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
                 onKeyDown={handleKeyDown}
                 placeholder="Message..."
                 rows={1}
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 resize-none max-h-32 scrollbar-hide min-w-0"
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none resize-none max-h-32 scrollbar-hide min-w-0"
                 style={{ minHeight: '40px' }}
               />
 
               {!newMessage.trim() && (
                 <div className="shrink-0">
-                  <AudioErrorBoundary>
-                    <AudioRecorder
-                      groupId={groupId}
-                      onOptimisticMessage={(msg) => {
-                        setMessages(prev => [...prev, { ...msg, user: currentUserProfile } as any])
-                        setTimeout(() => scrollToBottom(), 50)
-                      }}
-                      onReplaceOptimistic={(tempId, realMsg) => {
-                        setMessages(prev => prev.map(m => m.id === tempId ? { ...realMsg, user: currentUserProfile, isPending: false } as any : m))
-                      }}
-                    />
-                  </AudioErrorBoundary>
+                  <AudioRecorder
+                    groupId={groupId}
+                    onOptimisticMessage={(msg) => {
+                      setMessages(prev => [...prev, { ...msg, user: currentUserProfile } as any])
+                      setTimeout(() => scrollToBottom(), 50)
+                    }}
+                    onReplaceOptimistic={(tempId, realMsg) => {
+                      setMessages(prev => prev.map(m => m.id === tempId ? { ...realMsg, user: currentUserProfile, isPending: false } as any : m))
+                    }}
+                  />
                 </div>
               )}
 
