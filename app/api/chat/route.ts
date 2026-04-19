@@ -3,7 +3,28 @@ import { google } from '@ai-sdk/google'
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json()
+    const body = await req.json()
+
+    // ── Validation taille des messages ───────────────────────────
+    const MAX_MESSAGES = 20
+    const MAX_MSG_LEN  = 2_000
+
+    // Limiter le nombre de messages dans l'historique
+    const rawMessages = body?.messages ?? []
+    if (rawMessages.length > MAX_MESSAGES * 2) {
+      // Garder uniquement les 20 derniers messages
+      body.messages = rawMessages.slice(-MAX_MESSAGES)
+    }
+
+    // Tronquer les messages trop longs
+    body.messages = body.messages.map((m: any) => ({
+      ...m,
+      content: typeof m.content === 'string'
+        ? m.content.slice(0, MAX_MSG_LEN)
+        : m.content,
+    }))
+
+    const { messages } = body
 
     // Clean messages to ensure they match CoreMessage schema
     const coreMessages = messages.map((m: any) => {
@@ -23,8 +44,8 @@ export async function POST(req: Request) {
     }).filter((m: any) => m.role !== 'data') // Filter out any remaining data messages if preferred
 
     const result = streamText({
-      model: google('gemini-flash-latest'),
-      system: `Tu es le \"Coach Likelemba\", l'assistant d'intelligence artificielle intégré à l'application Likelemba (anciennement Tontigo).
+      model: google('gemini-2.0-flash'),
+      system: `Tu es le "Coach Likelemba", l'assistant d'intelligence artificielle intégré à l'application Likelemba (anciennement Tontigo).
 La plateforme aide les utilisateurs d'Afrique francophone (notamment au Congo, Brazzaville) à gérer leurs finances personnelles à travers l'épargne collaborative (les Tontines/Likelemba) et l'épargne individuelle (les coffres-forts).
 
 Ton but est d'aider les utilisateurs, de répondre à leurs questions sur la plateforme et de leur donner d'excellents conseils financiers pour éviter les pénalités et faire grandir leur « Trust Score » (Score de Confiance).
@@ -33,8 +54,8 @@ Règles :
 - Sois très chaleureux, encourageant et concis.
 - Utilise un langage clair, simple (français sans jargon complexe) et accessible.
 - Tu peux glisser quelques mots d'argot local congolais avec modération (ex: Mbote, Ko luka, etc.) pour créer du lien.
-- Tu as interdiction de donner des conseils financiers légaux qui engageraient ta responsabilité, ajoute des clauses de style \"C'est un conseil personnel\" si on te demande d'investir de grosses sommes.
-- Si on te demande qui t'a créé, réponds \"L'équipe d'ingénierie de Likelemba propulsée par Gemini\".`,
+- Tu as interdiction de donner des conseils financiers légaux qui engageraient ta responsabilité, ajoute des clauses de style "C'est un conseil personnel" si on te demande d'investir de grosses sommes.
+- Si on te demande qui t'a créé, réponds "L'équipe d'ingénierie de Likelemba propulsée par Gemini".`,
       messages: coreMessages,
     })
 
