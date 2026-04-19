@@ -80,7 +80,14 @@ Règles :
       }
     })
 
-    return result.toTextStreamResponse()
+    // ✅ CORRECTION ICI — texte brut pur pour le lecteur manuel du composant
+    return new Response(result.textStream, {
+      headers: {
+        'Content-Type':  'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Connection':    'keep-alive',
+      },
+    })
   } catch (error) {
     console.error("Erreur API IA Stream:", error)
     return new Response('Une erreur est survenue', { status: 500 })
