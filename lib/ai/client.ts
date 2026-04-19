@@ -1,6 +1,12 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
 
+const AI_MODELS = {
+  fast:     'gemini-2.0-flash',              // Conversations, streaming
+  lite:     'gemini-2.0-flash-lite',         // JSON, modération, modules courts
+  pro:      'gemini-2.5-pro-preview-05-06',  // Analyses complexes
+} as const
+
 /**
  * Fonction centrale d'appel à l'API IA utilisant le AI SDK (Gemini par défaut).
  * Toutes les fonctions IA du projet passent par ici.
@@ -13,7 +19,7 @@ export async function callAI(params: {
 }): Promise<string> {
   try {
     const { text } = await generateText({
-      model: google('gemini-1.5-flash'),
+      model: google(params.jsonMode ? AI_MODELS.lite : AI_MODELS.fast),
       system: params.jsonMode
         ? `${params.system}\n\nRéponds UNIQUEMENT avec un objet JSON valide. Aucun texte avant ou après. Aucun bloc markdown. JSON pur.`
         : params.system,
@@ -23,8 +29,11 @@ export async function callAI(params: {
 
     return text.trim()
   } catch (error: any) {
-    console.error('AI call failed:', error.message)
-    throw error
+    console.error('AI call failed:', {
+      message: error?.message?.slice(0, 200),
+      status:  error?.status,
+    })
+    return ''
   }
 }
 
@@ -42,6 +51,8 @@ export async function callAIJSON<T>(params: {
       ...params,
       jsonMode: true,
     })
+
+    if (!text) return params.fallback
 
     // Nettoyer les éventuels backticks markdown
     const cleaned = text

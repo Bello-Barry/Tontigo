@@ -28,6 +28,7 @@ import {
 } from '@/lib/actions/ia.actions'
 import { toast } from 'react-toastify'
 import { cn } from '@/lib/utils'
+import { MarkdownMessage } from '@/components/ia/MarkdownMessage'
 
 export function AICoach() {
   const [isOpen, setIsOpen] = useState(false)
@@ -306,12 +307,16 @@ export function AICoach() {
                         ? "bg-emerald-600/10 text-emerald-50 border border-emerald-600/20 rounded-tr-none"
                         : "bg-slate-900 text-slate-200 border border-slate-800 rounded-tl-none"
                     )}>
-                      <span className="whitespace-pre-wrap break-words">
-                        {renderMessageContent(m)}
+                      <div className="break-words">
+                        {m.role === 'assistant' ? (
+                          <MarkdownMessage content={renderMessageContent(m)} />
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{renderMessageContent(m)}</p>
+                        )}
                         {isLoading && m.role === 'assistant' && m === messages[messages.length - 1] && (
                           <span className="inline-block w-1 h-4 bg-emerald-500 ml-1 animate-pulse align-middle" />
                         )}
-                      </span>
+                      </div>
                     </div>
                   </div>
                 ))}
