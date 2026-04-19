@@ -92,7 +92,7 @@ export async function POST(req: Request) {
       model:       google('gemini-2.0-flash'),
       system:      SYSTEM_PROMPT,
       messages:    coreMessages,
-      maxTokens:   800,
+      max_tokens:  800,
       temperature: 0.75,
 
       onFinish: async ({ text: fullReply }) => {
@@ -134,10 +134,10 @@ export async function POST(req: Request) {
           console.error('onFinish save error:', err)
         }
       },
-    })
+    } as any)
 
     // ── 5. Retourner le stream texte brut ─────────────────────
-    return new Response(result.textStream, {
+    return new Response(result.textStream as any, {
       headers: {
         'Content-Type':  'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache, no-store',
