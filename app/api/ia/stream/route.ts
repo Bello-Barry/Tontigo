@@ -79,7 +79,7 @@ export async function POST(req: Request) {
       model:       google('gemini-1.5-flash'),
       system:      SYSTEM_PROMPT,
       messages:    coreMessages,
-      maxTokens:   800,
+      maxCompletionTokens: 800,
       temperature: 0.75,
       onFinish: async ({ text: fullReply }: any) => {
         if (!fullReply?.trim()) return

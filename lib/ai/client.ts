@@ -38,7 +38,7 @@ export async function callAI(params: {
   const safePrompt = sanitizeInput(params.prompt, LIMITS.maxPromptLength)
 
   const systemPrompt = params.jsonMode
-    ? `${safeSystem}\n\nRéponds UNIQUEMENT avec un objet JSON valide. Aucun texte avant ou après. Aucun bloc markdown. JSON pur.`
+    ? `${safeSystem}\n\nRéponds UNIQUEMENT with a valid JSON object. No text before or after. No markdown blocks. Pure JSON.`
     : safeSystem
 
   const maxTokens = Math.min(params.maxTokens ?? LIMITS.maxTokens, LIMITS.maxTokens)

@@ -192,7 +192,7 @@ export function AICoach() {
     if (m.role === 'assistant') {
       return <MarkdownMessage content={m.content} />
     }
-    return <p className="whitespace-pre-wrap break-words">{m.content}</p>
+    return <p className="whitespace-pre-wrap break-words text-sm">{m.content}</p>
   }
 
   return (
@@ -218,7 +218,7 @@ export function AICoach() {
             <div className="flex items-center gap-3">
               {view === 'history' ? (
                 <Button variant="ghost" size="icon" onClick={() => setView('chat')} className="text-slate-400">
-                   <Plus className="w-5 h-5 rotate-45" />
+                   <Plus className="w-5 h-5" />
                 </Button>
               ) : (
                 <Button variant="ghost" size="icon" onClick={() => setView('history')} className="text-slate-400">
@@ -303,7 +303,7 @@ export function AICoach() {
                   </div>
                 ))}
 
-                {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+                {isLoading && (messages.length === 0 || messages[messages.length - 1]?.role !== 'assistant') && (
                   <div className="flex gap-3">
                     <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm">
                       <Bot size={14} />
