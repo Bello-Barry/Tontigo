@@ -104,9 +104,14 @@ export function AICoach() {
     setMessages([...newHistory, streamingMsg])
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+
       const response = await fetch('/api/ia/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
         body: JSON.stringify({
           message: trimmed,
           history: messages.map((m: any) => ({ role: m.role, content: m.content || '' })),
