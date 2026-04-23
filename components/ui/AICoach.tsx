@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import ReactMarkdown from 'react-markdown'
 
 import {
   Send,
@@ -306,12 +307,29 @@ export function AICoach() {
                         ? "bg-emerald-600/10 text-emerald-50 border border-emerald-600/20 rounded-tr-none"
                         : "bg-slate-900 text-slate-200 border border-slate-800 rounded-tl-none"
                     )}>
-                      <span className="whitespace-pre-wrap break-words">
-                        {renderMessageContent(m)}
-                        {isLoading && m.role === 'assistant' && m === messages[messages.length - 1] && (
-                          <span className="inline-block w-1 h-4 bg-emerald-500 ml-1 animate-pulse align-middle" />
-                        )}
-                      </span>
+                      {m.role === 'user' ? (
+                        <span className="whitespace-pre-wrap break-words">{renderMessageContent(m)}</span>
+                      ) : (
+                        <div className="prose prose-invert prose-sm max-w-none
+                          prose-p:my-1 prose-p:leading-relaxed
+                          prose-headings:text-emerald-400 prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1
+                          prose-h1:text-base prose-h2:text-sm prose-h3:text-sm
+                          prose-strong:text-white prose-strong:font-semibold
+                          prose-em:text-slate-300
+                          prose-ul:my-1 prose-ul:pl-4 prose-li:my-0.5
+                          prose-ol:my-1 prose-ol:pl-4
+                          prose-code:text-emerald-300 prose-code:bg-slate-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:before:content-none prose-code:after:content-none
+                          prose-blockquote:border-l-emerald-500 prose-blockquote:text-slate-400 prose-blockquote:italic
+                          prose-hr:border-slate-700
+                        ">
+                          <ReactMarkdown>
+                            {renderMessageContent(m)}
+                          </ReactMarkdown>
+                          {isLoading && m === messages[messages.length - 1] && (
+                            <span className="inline-block w-1 h-4 bg-emerald-500 ml-1 animate-pulse align-middle" />
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
