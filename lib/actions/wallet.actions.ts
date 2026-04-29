@@ -2,6 +2,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
 import { revalidatePath } from 'next/cache'
+import { transfer as momoTransfer, getDisbursementStatus } from '@/lib/momo'
 import type { ActionResult } from '@/lib/types'
 
 // ── Créditer le portefeuille après réception d'une cagnotte ──
@@ -89,7 +90,8 @@ export async function creditWalletFromVault(params: {
 export async function withdrawFromWallet(params: {
   amount:     number
   walletType: 'mtn' | 'airtel'
-  source:     'tontine' | 'savings' | 'all'
+  source:     'tontine' | 'savings' | 'all',
+  customPhone?: string
 }): Promise<ActionResult<{ reference: string; netAmount: number }>> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -115,19 +117,18 @@ export async function withdrawFromWallet(params: {
     if (params.amount > availableBalance)  return { error: `Solde insuffisant. Disponible : ${availableBalance.toLocaleString('fr-FR')} FCFA` }
     if (params.amount < 500)               return { error: 'Retrait minimum : 500 FCFA' }
 
-    // Récupérer le numéro wallet
     const { data: profile } = await serviceClient
       .from('users')
       .select('wallet_mtn, wallet_airtel')
       .eq('id', user.id)
       .single()
 
-    const destPhone = params.walletType === 'mtn'
+    const destPhone = params.customPhone || (params.walletType === 'mtn'
       ? profile?.wallet_mtn
-      : profile?.wallet_airtel
+      : profile?.wallet_airtel)
 
     if (!destPhone) {
-      return { error: `Numéro ${params.walletType === 'mtn' ? 'MTN Money' : 'Airtel Money'} non renseigné dans ton profil` }
+      return { error: `Numéro ${params.walletType === 'mtn' ? 'MTN Money' : 'Airtel Money'} non renseigné` }
     }
 
     // ── S4: Fraude sur gros retraits ──────────────────────────
@@ -145,56 +146,104 @@ export async function withdrawFromWallet(params: {
 
     // Commission 0% sur les retraits de portefeuille
     const netAmount = params.amount
-    const reference = `LK-WALLET-${Date.now()}-${user.id.slice(0, 6)}`
+    
+    if (params.walletType === 'mtn') {
+      try {
+        const referenceId = await momoTransfer({
+          amount: netAmount,
+          phone: destPhone,
+          externalId: referenceId, // UUID pour le callback
+          payerMessage: `Retrait Tontigo`,
+          payeeNote: `Retrait Portefeuille`
+        })
 
-    // MODE SIMULATION / SANDBOX
-    const IS_SANDBOX = true // Forcé à true pour test immédiat utilisateur
-
-    if (IS_SANDBOX) {
-      const simulatedRef = `SANDBOX-${Date.now()}`
-
-      // Débiter le portefeuille
-      const updates: Record<string, any> = { updated_at: new Date().toISOString() }
-
-      if (params.source === 'tontine' || params.source === 'all') {
-        const tontineBal = Number(wallet.tontine_balance)
-        const debit = params.source === 'all'
-          ? Math.min(params.amount, tontineBal)
-          : params.amount
-        updates.tontine_balance = tontineBal - debit
-
-        if (params.source === 'all' && params.amount > tontineBal) {
-          updates.savings_balance = Number(wallet.savings_balance) - (params.amount - tontineBal)
+        // 2. Débiter le portefeuille (on considère l'initiation comme un débit immédiat pour éviter le double-retrait)
+        const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+        if (params.source === 'tontine' || params.source === 'all') {
+          const tontineBal = Number(wallet.tontine_balance)
+          const debit = params.source === 'all' ? Math.min(params.amount, tontineBal) : params.amount
+          updates.tontine_balance = tontineBal - debit
+          if (params.source === 'all' && params.amount > tontineBal) {
+            updates.savings_balance = Number(wallet.savings_balance) - (params.amount - tontineBal)
+          }
+        } else if (params.source === 'savings') {
+          updates.savings_balance = Number(wallet.savings_balance) - params.amount
         }
-      } else if (params.source === 'savings') {
-        updates.savings_balance = Number(wallet.savings_balance) - params.amount
+
+        await serviceClient.from('virtual_wallet').update(updates).eq('user_id', user.id)
+
+        // 3. Enregistrer le mouvement (Statut PENDING)
+        await serviceClient.from('wallet_movements').insert({
+          user_id:        user.id,
+          type:           `withdrawal_mtn`,
+          amount:         netAmount,
+          balance_before: availableBalance,
+          balance_after:  availableBalance - netAmount,
+          description:    `Retrait vers MTN Money (En attente confirmation) (Réf: ${referenceId})`,
+          wallet_used:    'mtn',
+          external_ref:   referenceId,
+          status:         'pending'
+        })
+
+        revalidatePath('/portefeuille')
+        return { data: { reference: referenceId, netAmount }, success: true }
+      } catch (err: any) {
+        console.error('MTN Transfer error:', err)
+        return { error: 'Échec de la transaction MTN. Réessaye plus tard.' }
       }
-
-      await serviceClient.from('virtual_wallet').update(updates).eq('user_id', user.id)
-
-      // Enregistrer le mouvement
-      await serviceClient.from('wallet_movements').insert({
-        user_id:        user.id,
-        type:           `withdrawal_${params.walletType}`,
-        amount:         netAmount,
-        balance_before: availableBalance,
-        balance_after:  availableBalance - netAmount,
-        description:    `[SIMULATION] Retrait vers ${params.walletType === 'mtn' ? 'MTN Money' : 'Airtel Money'}`,
-        wallet_used:    params.walletType,
-        external_ref:   simulatedRef,
-      })
-
-      revalidatePath('/portefeuille')
-      revalidatePath('/dashboard')
-      return { data: { reference: simulatedRef, netAmount: params.amount }, success: true }
     }
 
-    // En production : appel MTN réel (à implémenter via lib/mtn/disbursement)
-    return { error: 'Service de retrait en maintenance. Réessaye plus tard.' }
+    // MODE SIMULATION / AIRTEL (Fallback)
+    const simulatedRef = `SIM-${Date.now()}`
+    const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+
+    if (params.source === 'tontine' || params.source === 'all') {
+      const tontineBal = Number(wallet.tontine_balance)
+      const debit = params.source === 'all' ? Math.min(params.amount, tontineBal) : params.amount
+      updates.tontine_balance = tontineBal - debit
+      if (params.source === 'all' && params.amount > tontineBal) {
+        updates.savings_balance = Number(wallet.savings_balance) - (params.amount - tontineBal)
+      }
+    } else if (params.source === 'savings') {
+      updates.savings_balance = Number(wallet.savings_balance) - params.amount
+    }
+
+    await serviceClient.from('virtual_wallet').update(updates).eq('user_id', user.id)
+
+    await serviceClient.from('wallet_movements').insert({
+      user_id:        user.id,
+      type:           `withdrawal_${params.walletType}`,
+      amount:         netAmount,
+      balance_before: availableBalance,
+      balance_after:  availableBalance - netAmount,
+      description:    `[SIMULATION] Retrait vers ${params.walletType === 'mtn' ? 'MTN Money' : 'Airtel Money'}`,
+      wallet_used:    params.walletType,
+      external_ref:   simulatedRef,
+    })
+
+    revalidatePath('/portefeuille')
+    revalidatePath('/dashboard')
+    return { data: { reference: simulatedRef, netAmount }, success: true }
 
   } catch (err: any) {
     console.error('withdrawFromWallet unexpected error:', err?.message)
     return { error: 'Erreur inattendue lors du retrait' }
+  }
+}
+
+/**
+ * Vérifie le statut d'un retrait MTN
+ */
+export async function verifyWithdrawal(referenceId: string): Promise<ActionResult<{ status: string }>> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
+
+  try {
+    const statusData = await getDisbursementStatus(referenceId)
+    return { data: { status: statusData.status }, success: true }
+  } catch (err: any) {
+    return { error: 'Erreur lors de la vérification du retrait' }
   }
 }
 

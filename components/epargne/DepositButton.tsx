@@ -11,6 +11,7 @@ export function DepositButton({ vaultId }: { vaultId: string }) {
   const [open, setOpen]     = useState(false)
   const [amount, setAmount] = useState('')
   const [wallet, setWallet] = useState<'mtn' | 'airtel'>('mtn')
+  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -18,17 +19,54 @@ export function DepositButton({ vaultId }: { vaultId: string }) {
     const num = parseInt(amount)
     if (!num || num < 500) { toast.error('Minimum 500 FCFA'); return }
     setLoading(true)
-    const result = await depositToVault(vaultId, { amount: num, wallet_type: wallet })
-    if (result.error) {
-      toast.error(result.error)
+    try {
+      const result = await depositToVault(vaultId, { amount: num, wallet_type: wallet }, phone)
+      if (result.error) {
+        toast.error(result.error)
+        setLoading(false)
+        return
+      }
+
+      if (wallet === 'mtn' && result.data?.reference) {
+        const refId = result.data.reference
+        toast.info('📱 Veuillez confirmer le versement sur votre téléphone...', {
+          autoClose: false,
+          toastId: 'momo-savings-pending'
+        })
+
+        // Polling
+        let attempts = 0
+        const interval = setInterval(async () => {
+          attempts++
+          const { verifySavingsPayment } = await import('@/lib/actions/epargne.actions')
+          const check = await verifySavingsPayment(refId, vaultId)
+          
+          if (check.data?.status === 'SUCCESSFUL') {
+            clearInterval(interval)
+            toast.dismiss('momo-savings-pending')
+            toast.success('✅ Versement MoMo réussi !')
+            setOpen(false)
+            setAmount('')
+            setLoading(false)
+            router.refresh()
+          } else if (check.data?.status === 'FAILED' || attempts > 40) {
+            clearInterval(interval)
+            toast.dismiss('momo-savings-pending')
+            toast.error(attempts > 40 ? 'Délai expiré.' : '❌ Échec du versement.')
+            setLoading(false)
+          }
+        }, 3000)
+      } else {
+        toast.success('✅ Versement enregistré !')
+        setAmount('')
+        setOpen(false)
+        router.refresh()
+        setLoading(false)
+      }
+    } catch (err) {
+      toast.error('Erreur lors du versement')
       setLoading(false)
-      return
     }
-    toast.success('✅ Versement enregistré !')
-    setAmount('')
-    setOpen(false)
-    router.refresh()
-    setLoading(false)
   }
 
   if (!open) {
@@ -67,6 +105,17 @@ export function DepositButton({ vaultId }: { vaultId: string }) {
             {w === 'mtn' ? 'MTN Money' : 'Airtel Money'}
           </button>
         ))}
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs text-slate-400">Numéro {wallet === 'mtn' ? 'MTN' : 'Airtel'} Money</label>
+        <Input
+          placeholder="Ex: 06xxx..."
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          className="bg-slate-800 border-slate-700 text-white h-11"
+        />
+        <p className="text-[10px] text-slate-500 italic">Laisse vide pour utiliser ton numéro par défaut.</p>
       </div>
       <div className="flex gap-3">
         <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 border-slate-700 text-slate-300">

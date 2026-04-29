@@ -6,6 +6,7 @@ import { calculateGuarantee } from '@/lib/utils/guarantee'
 import { calculatePayoutCommission } from '@/lib/utils/commission'
 import { recordRevenue } from './commission.actions'
 import { creditWalletFromPayout } from './wallet.actions'
+import { requestToPay, getCollectionStatus } from '@/lib/momo'
 import type { ActionResult } from '@/lib/types'
 
 // CRÉER UN GROUPE
@@ -200,12 +201,43 @@ export async function payContribution(
     const membership = contribution.memberships as unknown as { total_paid: number; user_id: string }
     if (membership.user_id !== user.id) return { error: 'Non autorisé' }
 
+    if (walletType === 'mtn') {
+      let phoneToUse = customPhone
+
+      if (!phoneToUse) {
+        const { data: profile } = await serviceClient
+          .from('users')
+          .select('wallet_mtn')
+          .eq('id', user.id)
+          .single()
+        phoneToUse = profile?.wallet_mtn
+      }
+
+      if (!phoneToUse) {
+        return { error: 'Numéro MTN Money non configuré dans ton profil' }
+      }
+
+      // 2. Lancer la requête de paiement (USSD Push)
+      const referenceId = await requestToPay({
+        amount: contribution.amount,
+        phone: phoneToUse,
+        externalId: referenceId, // UUID pour le callback
+        payerMessage: `Cotisation Tontigo - ${contributionId.slice(0, 6)}`,
+        payeeNote: 'Tontigo'
+      })
+
+      // On enregistre la référence immédiatement pour que le webhook puisse la retrouver
+      await serviceClient.from('contributions').update({
+        payment_reference: referenceId
+      }).eq('id', contributionId)
+
+      return { data: { reference: referenceId }, success: true }
+    }
+
+    // --- Pour Airtel ou Simulation ---
     const paymentRef = `TG-COT-${Date.now()}-${contributionId.slice(0, 6)}`
-
-    // Simuler le succès du paiement
-    const paymentSuccess = true
-    if (!paymentSuccess) return { error: 'Échec du paiement mobile' }
-
+    
+    // simulation...
     await serviceClient.from('contributions').update({
       status:            'paye',
       paid_at:           new Date().toISOString(),
@@ -234,18 +266,86 @@ export async function payContribution(
       status:             'success'
     })
 
-    // +2 points de confiance pour paiement à temps
     if (contribution.days_late === 0) {
       await serviceClient.rpc('update_trust_score', { p_user_id: user.id, p_delta: 2 })
     }
 
-    // Vérifier si toutes les cotisations du tour sont payées → déclencher le versement
     await checkPayoutsStatus(contribution.group_id)
-
     revalidatePath(`/tontine/${contribution.group_id}`)
     return { data: { reference: paymentRef }, success: true }
   } catch (err: any) {
+    console.error('payContribution error:', err)
     return { error: 'Erreur lors du paiement' }
+  }
+}
+
+/**
+ * Vérifie le statut d'un paiement MTN et finalise la cotisation si SUCCESSFUL
+ */
+export async function verifyContributionPayment(
+  referenceId: string,
+  contributionId: string
+): Promise<ActionResult<{ status: string }>> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
+
+  try {
+    const statusData = await getCollectionStatus(referenceId)
+    const status = statusData.status // PENDING, SUCCESSFUL, FAILED
+
+    if (status === 'SUCCESSFUL') {
+      const { data: contribution } = await serviceClient
+        .from('contributions')
+        .select('*, memberships(total_paid, user_id)')
+        .eq('id', contributionId)
+        .single()
+
+      if (!contribution || contribution.status === 'paye') {
+        return { data: { status }, success: true }
+      }
+
+      const membership = contribution.memberships as unknown as { total_paid: number; user_id: string }
+
+      // Finaliser le paiement en base de données
+      await serviceClient.from('contributions').update({
+        status:            'paye',
+        paid_at:           new Date().toISOString(),
+        payment_reference: referenceId,
+      }).eq('id', contributionId)
+
+      await serviceClient.from('memberships').update({
+        total_paid: Number(membership.total_paid) + contribution.amount,
+      }).eq('id', contribution.membership_id)
+
+      const solidarityAmount = Math.round(contribution.amount * 0.02)
+      await serviceClient.rpc('increment_solidarity_pool', {
+        p_group_id: contribution.group_id,
+        p_amount:   solidarityAmount,
+      })
+
+      await serviceClient.from('transactions').insert({
+        user_id:            user.id,
+        reference_id:       contributionId,
+        type:               'cotisation',
+        amount:             contribution.amount,
+        wallet_used:        'mtn',
+        external_reference: referenceId,
+        status:             'success'
+      })
+
+      if (contribution.days_late === 0) {
+        await serviceClient.rpc('update_trust_score', { p_user_id: user.id, p_delta: 2 })
+      }
+
+      await checkPayoutsStatus(contribution.group_id)
+      revalidatePath(`/tontine/${contribution.group_id}`)
+    }
+
+    return { data: { status }, success: true }
+  } catch (err: any) {
+    console.error('verifyContributionPayment error:', err)
+    return { error: 'Erreur lors de la vérification' }
   }
 }
 

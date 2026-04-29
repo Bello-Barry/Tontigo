@@ -22,6 +22,7 @@ export function WithdrawWalletButton({
   const [open, setOpen]       = useState(false)
   const [amount, setAmount]   = useState(String(maxAmount))
   const [wallet, setWallet]   = useState<'mtn' | 'airtel'>('mtn')
+  const [phone, setPhone]     = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -31,22 +32,59 @@ export function WithdrawWalletButton({
     if (num > maxAmount)           { toast.error('Montant supérieur au solde'); return }
 
     setLoading(true)
-    const result = await withdrawFromWallet({
-      amount:     num,
-      walletType: wallet,
-      source,
-    })
+    try {
+      const result = await withdrawFromWallet({
+        amount:     num,
+        walletType: wallet,
+        source,
+        customPhone: phone,
+      })
 
-    if (result.error) {
-      toast.error(result.error)
+      if (result.error) {
+        toast.error(result.error)
+        setLoading(false)
+        return
+      }
+
+      if (wallet === 'mtn' && result.data?.reference) {
+        const refId = result.data.reference
+        toast.info('💸 Traitement du retrait vers MTN Money...', {
+          autoClose: false,
+          toastId: 'withdraw-pending'
+        })
+
+        // Polling pour vérifier le statut du décaissement
+        let attempts = 0
+        const interval = setInterval(async () => {
+          attempts++
+          const { verifyWithdrawal } = await import('@/lib/actions/wallet.actions')
+          const check = await verifyWithdrawal(refId)
+          
+          if (check.data?.status === 'SUCCESSFUL') {
+            clearInterval(interval)
+            toast.dismiss('withdraw-pending')
+            toast.success(`✅ ${formatFCFA(num)} envoyés sur ton MTN Money !`)
+            setOpen(false)
+            setLoading(false)
+            router.refresh()
+          } else if (check.data?.status === 'FAILED' || attempts > 20) {
+            clearInterval(interval)
+            toast.dismiss('withdraw-pending')
+            toast.error(attempts > 20 ? 'Délai expiré. Vérifie ton solde MTN.' : '❌ Échec du retrait mobile.')
+            setLoading(false)
+          }
+        }, 3000)
+      } else {
+        // Simulation ou Airtel
+        toast.success(`✅ ${formatFCFA(num)} envoyés sur ton portefeuille mobile !`)
+        setOpen(false)
+        setLoading(false)
+        router.refresh()
+      }
+    } catch (err) {
+      toast.error('Erreur lors du retrait')
       setLoading(false)
-      return
     }
-
-    toast.success(`✅ ${formatFCFA(result.data!.netAmount)} envoyés sur ton ${wallet === 'mtn' ? 'MTN Money' : 'Airtel Money'} !`)
-    setOpen(false)
-    router.refresh()
-    setLoading(false)
   }
 
   if (!open) {
@@ -106,6 +144,17 @@ export function WithdrawWalletButton({
             {w === 'mtn' ? '🟡 MTN Money' : '🔴 Airtel Money'}
           </button>
         ))}
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs text-slate-400">Numéro {wallet === 'mtn' ? 'MTN' : 'Airtel'} Money</label>
+        <Input
+          placeholder="Ex: 06xxx..."
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          className="bg-slate-800 border-slate-700 text-white h-11"
+        />
+        <p className="text-[10px] text-slate-500 italic">Laisse vide pour utiliser ton numéro par défaut.</p>
       </div>
 
       {/* Actions */}

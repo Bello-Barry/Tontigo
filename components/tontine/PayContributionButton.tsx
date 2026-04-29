@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { toast } from 'react-toastify'
-import { payContribution } from '@/lib/actions/tontine.actions'
+import { payContribution, verifyContributionPayment } from '@/lib/actions/tontine.actions'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Loader2, Wallet } from 'lucide-react'
@@ -16,6 +16,7 @@ interface PayContributionButtonProps {
 export function PayContributionButton({ contribution }: PayContributionButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [selectedWallet, setSelectedWallet] = useState<'mtn' | 'airtel'>('mtn')
+  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -24,17 +25,49 @@ export function PayContributionButton({ contribution }: PayContributionButtonPro
   const handlePayment = async () => {
     setLoading(true)
     try {
-      const result = await payContribution(contribution.id, selectedWallet)
+      const result = await payContribution(contribution.id, selectedWallet, phone)
       if (result.error) {
         toast.error(result.error)
+        setLoading(false)
+        return
+      }
+
+      if (selectedWallet === 'mtn' && result.data?.reference) {
+        const refId = result.data.reference
+        toast.info('📱 Veuillez confirmer le paiement sur votre téléphone (USSD Prompt)...', {
+          autoClose: false,
+          toastId: 'momo-pending'
+        })
+
+        // Polling pour vérifier le statut (toutes les 3 secondes, max 2 minutes)
+        let attempts = 0
+        const interval = setInterval(async () => {
+          attempts++
+          const check = await verifyContributionPayment(refId, contribution.id)
+          
+          if (check.data?.status === 'SUCCESSFUL') {
+            clearInterval(interval)
+            toast.dismiss('momo-pending')
+            toast.success('✅ Cotisation payée avec succès !')
+            setIsOpen(false)
+            setLoading(false)
+            router.refresh()
+          } else if (check.data?.status === 'FAILED' || attempts > 40) {
+            clearInterval(interval)
+            toast.dismiss('momo-pending')
+            toast.error(attempts > 40 ? 'Délai expiré. Vérifie ton application MTN.' : '❌ Paiement échoué ou annulé.')
+            setLoading(false)
+          }
+        }, 3000)
       } else {
+        // Cas Airtel ou Simulation sans polling
         toast.success('✅ Cotisation payée avec succès !')
         setIsOpen(false)
+        setLoading(false)
         router.refresh()
       }
     } catch (err) {
       toast.error('Erreur lors du paiement')
-    } finally {
       setLoading(false)
     }
   }
@@ -70,6 +103,17 @@ export function PayContributionButton({ contribution }: PayContributionButtonPro
             {w === 'mtn' ? '📱 MTN Money' : '🔴 Airtel Money'}
           </button>
         ))}
+      </div>
+      
+      <div className="space-y-1">
+        <label className="text-xs text-slate-400">Numéro {selectedWallet === 'mtn' ? 'MTN' : 'Airtel'} Money</label>
+        <Input
+          placeholder="Ex: 06xxx..."
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          className="bg-slate-800 border-slate-700 text-white h-11"
+        />
+        <p className="text-[10px] text-slate-500 italic">Laisse vide pour utiliser ton numéro par défaut.</p>
       </div>
 
       <div className="flex gap-3">

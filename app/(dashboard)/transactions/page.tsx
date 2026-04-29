@@ -9,6 +9,12 @@ export default async function TransactionsPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  const { data: profile } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user!.id)
+    .single()
+
   const { data: transactions } = await supabase
     .from('transactions')
     .select('*')
@@ -57,7 +63,7 @@ export default async function TransactionsPage() {
         {txs.length === 0 ? (
           <EmptyState title="Aucune transaction" description="Vous n'avez pas encore effectué de paiements sur Likelemba." />
         ) : (
-          txs.map(tx => <TransactionRow key={tx.id} tx={tx} />)
+          txs.map(tx => <TransactionRow key={tx.id} tx={tx} profile={profile} />)
         )}
       </div>
     </div>

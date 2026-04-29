@@ -6,6 +6,7 @@ import { Users, Target, Activity, ArrowRight, Wallet, ChevronRight } from 'lucid
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { getWalletData } from '@/lib/actions/wallet.actions'
+import { DashboardCharts } from '@/components/shared/DashboardCharts'
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
@@ -31,6 +32,13 @@ export default async function DashboardPage() {
     .eq('status', 'actif')
 
   const totalSavings = myVaults?.reduce((acc, vault) => acc + Number(vault.current_balance), 0) || 0
+
+  // Récupérer les transactions pour les graphiques
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', user!.id)
+    .order('created_at', { ascending: true })
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -105,6 +113,9 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Graphiques Financiers */}
+      <DashboardCharts transactions={transactions || []} />
 
       {/* Actions rapides */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
