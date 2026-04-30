@@ -182,7 +182,7 @@ export async function startGroup(groupId: string): Promise<ActionResult> {
 // PAYER UNE COTISATION
 export async function payContribution(
   contributionId: string,
-  walletType: 'mtn' | 'airtel'
+  walletType: 'mtn' | 'airtel', customPhone?: string
 ): Promise<ActionResult<{ reference: string }>> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -221,7 +221,7 @@ export async function payContribution(
       const referenceId = await requestToPay({
         amount: contribution.amount,
         phone: phoneToUse,
-        externalId: referenceId, // UUID pour le callback
+        externalId: crypto.randomUUID(), // UUID pour le callback
         payerMessage: `Cotisation Tontigo - ${contributionId.slice(0, 6)}`,
         payeeNote: 'Tontigo'
       })
