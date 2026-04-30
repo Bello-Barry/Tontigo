@@ -69,7 +69,7 @@ export function DashboardCharts({ transactions }: DashboardChartsProps) {
                 <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val/1000}k`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                  formatter={(val: number) => [formatFCFA(val), 'Total Épargné']}
+                  formatter={(val: any) => [formatFCFA(Number(val) || 0), 'Total Épargné']}
                 />
                 <Area type="monotone" dataKey="total" stroke="#10b981" fillOpacity={1} fill="url(#colorTotal)" strokeWidth={3} />
               </AreaChart>
@@ -90,7 +90,7 @@ export function DashboardCharts({ transactions }: DashboardChartsProps) {
         <CardContent className="h-[300px] flex flex-col justify-center">
           {pieData.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height="200">
+              <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -105,7 +105,7 @@ export function DashboardCharts({ transactions }: DashboardChartsProps) {
                   </Pie>
                   <Tooltip 
                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                     formatter={(val: number) => formatFCFA(val)}
+                     formatter={(val: any) => formatFCFA(Number(val) || 0)}
                   />
                 </PieChart>
               </ResponsiveContainer>
