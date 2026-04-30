@@ -25,7 +25,7 @@ export function PayContributionButton({ contribution }: PayContributionButtonPro
   const handlePayment = async () => {
     setLoading(true)
     try {
-      const result = await payContribution(contribution.id, selectedWallet, phone)
+      const result = await payContribution(contribution.id, selectedWallet)
       if (result.error) {
         toast.error(result.error)
         setLoading(false)
@@ -107,7 +107,7 @@ export function PayContributionButton({ contribution }: PayContributionButtonPro
       
       <div className="space-y-1">
         <label className="text-xs text-slate-400">Numéro {selectedWallet === 'mtn' ? 'MTN' : 'Airtel'} Money</label>
-        <Input
+        <input
           placeholder="Ex: 06xxx..."
           value={phone}
           onChange={e => setPhone(e.target.value)}

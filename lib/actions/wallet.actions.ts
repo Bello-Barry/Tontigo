@@ -123,12 +123,12 @@ export async function withdrawFromWallet(params: {
       .eq('id', user.id)
       .single()
 
-    const destPhone = params.customPhone || (params.walletType === 'mtn'
+    const destPhone = params.customPhone || (params.walletType.toString() === 'mtn'
       ? profile?.wallet_mtn
       : profile?.wallet_airtel)
 
     if (!destPhone) {
-      return { error: `Numéro ${params.walletType === 'mtn' ? 'MTN Money' : 'Airtel Money'} non renseigné` }
+      return { error: `Numéro ${params.walletType.toString() === 'mtn' ? 'MTN Money' : 'Airtel Money'} non renseigné` }
     }
 
     // ── S4: Fraude sur gros retraits ──────────────────────────
@@ -147,12 +147,12 @@ export async function withdrawFromWallet(params: {
     // Commission 0% sur les retraits de portefeuille
     const netAmount = params.amount
     
-    if (params.walletType === 'mtn') {
+    if (params.walletType.toString() === 'mtn') {
       try {
         const referenceId = await momoTransfer({
           amount: netAmount,
           phone: destPhone,
-          externalId: referenceId, // UUID pour le callback
+          externalId: crypto.randomUUID(), // UUID pour le callback
           payerMessage: `Retrait Tontigo`,
           payeeNote: `Retrait Portefeuille`
         })
@@ -216,7 +216,7 @@ export async function withdrawFromWallet(params: {
       amount:         netAmount,
       balance_before: availableBalance,
       balance_after:  availableBalance - netAmount,
-      description:    `[SIMULATION] Retrait vers ${params.walletType === 'mtn' ? 'MTN Money' : 'Airtel Money'}`,
+      description:    `[SIMULATION] Retrait vers ${params.walletType.toString() === 'mtn' ? 'MTN Money' : 'Airtel Money'}`,
       wallet_used:    params.walletType,
       external_ref:   simulatedRef,
     })
