@@ -182,7 +182,7 @@ export async function startGroup(groupId: string): Promise<ActionResult> {
 // PAYER UNE COTISATION
 export async function payContribution(
   contributionId: string,
-  walletType: 'mtn' | 'airtel'
+  walletType: 'mtn' | 'airtel', customPhone?: string
 ): Promise<ActionResult<{ reference: string }>> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -202,15 +202,14 @@ export async function payContribution(
     if (membership.user_id !== user.id) return { error: 'Non autorisé' }
 
     if (walletType === 'mtn') {
-      let phoneToUse = customPhone
-
+      let phoneToUse = customPhone;
       if (!phoneToUse) {
         const { data: profile } = await serviceClient
-          .from('users')
-          .select('wallet_mtn')
-          .eq('id', user.id)
-          .single()
-        phoneToUse = profile?.wallet_mtn
+          .from("users")
+          .select("wallet_mtn")
+          .eq("id", user.id)
+          .single();
+        phoneToUse = profile?.wallet_mtn;
       }
 
       if (!phoneToUse) {
@@ -221,7 +220,7 @@ export async function payContribution(
       const referenceId = await requestToPay({
         amount: contribution.amount,
         phone: phoneToUse,
-        externalId: referenceId, // UUID pour le callback
+        externalId: contributionId, // UUID pour le callback
         payerMessage: `Cotisation Tontigo - ${contributionId.slice(0, 6)}`,
         payeeNote: 'Tontigo'
       })

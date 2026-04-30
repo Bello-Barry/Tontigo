@@ -11,7 +11,7 @@ interface TransactionRowProps {
   profile?: any
 }
 
-export function TransactionRow({ tx }: TransactionRowProps) {
+export function TransactionRow({ tx, profile }: TransactionRowProps) {
   // Entrant: versement (tontine reçue) ou retrait_epargne (retour vers wallet)
   // Sortant: cotisation, avance dépôt épargne, abonnement, matching, ...
   const isIncoming = tx.type === 'versement' || tx.type === 'retrait_epargne'

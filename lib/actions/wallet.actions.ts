@@ -152,7 +152,7 @@ export async function withdrawFromWallet(params: {
         const referenceId = await momoTransfer({
           amount: netAmount,
           phone: destPhone,
-          externalId: referenceId, // UUID pour le callback
+          externalId: user.id + "-" + Date.now(), // UUID pour le callback
           payerMessage: `Retrait Tontigo`,
           payeeNote: `Retrait Portefeuille`
         })
@@ -216,7 +216,7 @@ export async function withdrawFromWallet(params: {
       amount:         netAmount,
       balance_before: availableBalance,
       balance_after:  availableBalance - netAmount,
-      description:    `[SIMULATION] Retrait vers ${params.walletType === 'mtn' ? 'MTN Money' : 'Airtel Money'}`,
+      description:    `[SIMULATION] Retrait vers ${'Airtel Money'}`,
       wallet_used:    params.walletType,
       external_ref:   simulatedRef,
     })
