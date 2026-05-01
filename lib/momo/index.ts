@@ -2,6 +2,7 @@ import crypto from 'crypto'
 
 const BASE_URL = process.env.MTN_MOMO_BASE_URL || 'https://sandbox.momodeveloper.mtn.com'
 const ENV = process.env.MTN_MOMO_ENV || 'sandbox'
+const CURRENCY = process.env.MTN_MOMO_CURRENCY || (ENV === 'sandbox' ? 'EUR' : 'XAF')
 
 // Collection Config
 const COLL_SUB_KEY = process.env.MOMO_COLLECTION_SUBSCRIPTION_KEY!
@@ -13,13 +14,13 @@ const DISB_SUB_KEY = process.env.MOMO_DISBURSEMENT_SUBSCRIPTION_KEY!
 const DISB_USER_ID = process.env.MOMO_DISBURSEMENT_API_USER_ID!
 const DISB_API_KEY = process.env.MOMO_DISBURSEMENT_API_KEY!
  
- // Callback Config — Use production URL on Vercel, fallback to MOMO_CALLBACK_HOST or VERCEL_URL
- const CALLBACK_HOST = process.env.MOMO_CALLBACK_HOST 
+// Callback Config
+const CALLBACK_HOST = process.env.MOMO_CALLBACK_HOST
    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
    || process.env.NEXT_PUBLIC_APP_URL
 
 /**
- * Génère un token d'accès pour un produit spécifique (collection ou disbursement)
+ * Génère un token d'accès
  */
 async function getToken(product: 'collection' | 'disbursement'): Promise<string> {
   const userId = product === 'collection' ? COLL_USER_ID : DISB_USER_ID
@@ -27,35 +28,38 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
   const subKey = product === 'collection' ? COLL_SUB_KEY : DISB_SUB_KEY
 
   if (!userId || !apiKey || !subKey) {
-    throw new Error(`Missing configuration for ${product}`)
+    throw new Error(`Configuration MoMo ${product} manquante.`)
   }
 
   const auth = Buffer.from(`${userId}:${apiKey}`).toString('base64')
 
-  const response = await fetch(`${BASE_URL}/${product}/token/`, {
-    method: 'POST',
-    headers: {
-      'Ocp-Apim-Subscription-Key': subKey,
-      'Authorization': `Basic ${auth}`,
-      'Content-Length': '0'
-    },
-    // Next.js caching behavior: disable cache for tokens
-    cache: 'no-store'
-  })
+  try {
+    const response = await fetch(`${BASE_URL}/${product}/token/`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': subKey,
+        'Authorization': `Basic ${auth}`,
+        'Content-Length': '0'
+      },
+      cache: 'no-store'
+    })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error(`Error fetching token for ${product}:`, response.status, errorText)
-    throw new Error(`Failed to get ${product} token: ${response.status}`)
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Token Error (${product}):`, response.status, errorText)
+      throw new Error(`MoMo Token Error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data.access_token
+  } catch (err: any) {
+    console.error(`MoMo Token Fetch Exception (${product}):`, err.message)
+    throw err
   }
-
-  const data = await response.json()
-  return data.access_token
 }
 
 /**
- * Initie une demande de paiement (Encaissement)
- * @returns Le Reference-Id de la transaction
+ * requestToPay
  */
 export async function requestToPay(params: {
   amount: number
@@ -66,10 +70,8 @@ export async function requestToPay(params: {
 }): Promise<string> {
   const token = await getToken('collection')
   const referenceId = crypto.randomUUID()
+  const cleanPhone = params.phone.replace('+', '').trim()
 
-  // Format the phone to have the correct prefix if needed, usually MSISDN in Sandbox is standard
-  // Example for MTN Sandbox: 46733123453
-  
   const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay`, {
     method: 'POST',
     headers: {
@@ -82,54 +84,29 @@ export async function requestToPay(params: {
     },
     body: JSON.stringify({
       amount: params.amount.toString(),
-      currency: 'EUR', // Sandbox only supports EUR
+      currency: CURRENCY,
       externalId: params.externalId,
       payer: {
         partyIdType: 'MSISDN',
-        partyId: params.phone
+        partyId: cleanPhone
       },
-      payerMessage: params.payerMessage,
-      payeeNote: params.payeeNote
+      payerMessage: params.payerMessage.slice(0, 80),
+      payeeNote: params.payeeNote.slice(0, 80)
     }),
     cache: 'no-store'
   })
 
   if (response.status !== 202) {
     const errorText = await response.text()
-    console.error('requestToPay error:', response.status, errorText)
-    throw new Error(`requestToPay failed with status ${response.status}`)
+    console.error('requestToPay API Error:', response.status, errorText)
+    throw new Error(`MoMo requestToPay: ${response.status}`)
   }
 
   return referenceId
 }
 
 /**
- * Vérifie le statut d'une demande de paiement
- * Statuts possibles: PENDING, SUCCESSFUL, FAILED
- */
-export async function getCollectionStatus(referenceId: string): Promise<any> {
-  const token = await getToken('collection')
-
-  const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay/${referenceId}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY
-    },
-    cache: 'no-store'
-  })
-
-  if (!response.ok) {
-    throw new Error(`getCollectionStatus failed with status ${response.status}`)
-  }
-
-  return response.json()
-}
-
-/**
- * Initie un transfert (Décaissement vers l'utilisateur)
- * @returns Le Reference-Id de la transaction
+ * transfer
  */
 export async function transfer(params: {
   amount: number
@@ -140,6 +117,7 @@ export async function transfer(params: {
 }): Promise<string> {
   const token = await getToken('disbursement')
   const referenceId = crypto.randomUUID()
+  const cleanPhone = params.phone.replace('+', '').trim()
 
   const response = await fetch(`${BASE_URL}/disbursement/v1_0/transfer`, {
     method: 'POST',
@@ -153,34 +131,44 @@ export async function transfer(params: {
     },
     body: JSON.stringify({
       amount: params.amount.toString(),
-      currency: 'EUR', // Sandbox only supports EUR
+      currency: CURRENCY,
       externalId: params.externalId,
       payee: {
         partyIdType: 'MSISDN',
-        partyId: params.phone
+        partyId: cleanPhone
       },
-      payerMessage: params.payerMessage,
-      payeeNote: params.payeeNote
+      payerMessage: params.payerMessage.slice(0, 80),
+      payeeNote: params.payeeNote.slice(0, 80)
     }),
     cache: 'no-store'
   })
 
   if (response.status !== 202) {
     const errorText = await response.text()
-    console.error('transfer error:', response.status, errorText)
-    throw new Error(`transfer failed with status ${response.status}`)
+    console.error('transfer API Error:', response.status, errorText)
+    throw new Error(`MoMo transfer: ${response.status}`)
   }
 
   return referenceId
 }
 
-/**
- * Vérifie le statut d'un transfert
- * Statuts possibles: PENDING, SUCCESSFUL, FAILED
- */
+export async function getCollectionStatus(referenceId: string): Promise<any> {
+  const token = await getToken('collection')
+  const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay/${referenceId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'X-Target-Environment': ENV,
+      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY
+    },
+    cache: 'no-store'
+  })
+  if (!response.ok) throw new Error(`MoMo Status Error: ${response.status}`)
+  return response.json()
+}
+
 export async function getDisbursementStatus(referenceId: string): Promise<any> {
   const token = await getToken('disbursement')
-
   const response = await fetch(`${BASE_URL}/disbursement/v1_0/transfer/${referenceId}`, {
     method: 'GET',
     headers: {
@@ -190,10 +178,6 @@ export async function getDisbursementStatus(referenceId: string): Promise<any> {
     },
     cache: 'no-store'
   })
-
-  if (!response.ok) {
-    throw new Error(`getDisbursementStatus failed with status ${response.status}`)
-  }
-
+  if (!response.ok) throw new Error(`MoMo Status Error: ${response.status}`)
   return response.json()
 }

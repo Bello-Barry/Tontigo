@@ -1,6 +1,7 @@
 'use server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
+import crypto from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { transfer as momoTransfer, getDisbursementStatus } from '@/lib/momo'
 import type { ActionResult } from '@/lib/types'
@@ -152,7 +153,7 @@ export async function withdrawFromWallet(params: {
         const referenceId = await momoTransfer({
           amount: netAmount,
           phone: destPhone,
-          externalId: user.id,
+          externalId: crypto.randomUUID(),
           payerMessage: `Retrait Tontigo`,
           payeeNote: `Retrait Portefeuille`
         })

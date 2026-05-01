@@ -1,11 +1,11 @@
 import { streamText } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { serviceClient } from '@/lib/supabase/service'
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 })
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { serviceClient } from '@/lib/supabase/service'
 
 // ─── Base de connaissances Likelemba (RAG simplifié) ────────────────────────
 const LIKELEMBA_KNOWLEDGE = `
@@ -83,7 +83,6 @@ export async function POST(req: Request) {
       return new Response('Message vide', { status: 400 })
     }
 
-    // Use actual user.id
     const userId = user.id
 
     // ─── Récupération du profil utilisateur (resilient) ───────────────────
@@ -109,7 +108,6 @@ export async function POST(req: Request) {
     const memberships= membershipsResult.status === 'fulfilled' ? membershipsResult.value.data : []
     const wallet     = walletResult.status      === 'fulfilled' ? walletResult.value.data      : null
 
-    // ─── Construction du contexte personnalisé ─────────────────────────────
     const activeTontineNames = (memberships || [])
       .map((t: any) => t.tontine_groups?.name)
       .filter(Boolean)
@@ -132,7 +130,6 @@ Utilise ces informations pour personnaliser tes conseils. Mentionne son prénom 
 
     const systemPrompt = BASE_SYSTEM + '\n\n' + userContext
 
-    // ─── Construction des messages ─────────────────────────────────────────
     const coreMessages = [
       ...history.map((m: any) => ({
         role: m.role,
@@ -141,18 +138,14 @@ Utilise ces informations pour personnaliser tes conseils. Mentionne son prénom 
       { role: 'user', content: message.trim() },
     ]
 
-    console.log("Appel streamText avec message:", message)
-    
-    // ─── Appel au modèle ───────────────────────────────────────────────────
     const result = streamText({
-      model: google('gemini-2.0-flash'),
+      model: google('gemini-1.5-flash'),
       system: systemPrompt,
       messages: coreMessages,
       temperature: 0.7,
       maxOutputTokens: 1500,
       onFinish: async (event) => {
         const fullReply = event.text
-        console.log("Réponse IA terminée:", fullReply.slice(0, 50) + "...")
         let targetId = conversationId
 
         if (!targetId) {

@@ -4,6 +4,7 @@ import { generateText } from 'ai'
 /**
  * Fonction centrale d'appel à l'API IA utilisant le AI SDK (Gemini par défaut).
  * Toutes les fonctions IA du projet passent par ici.
+ * On utilise gemini-1.5-flash par défaut pour la compatibilité maximale.
  */
 export async function callAI(params: {
   system:      string
@@ -24,7 +25,9 @@ export async function callAI(params: {
     return text.trim()
   } catch (error: any) {
     console.error('AI call failed:', error.message)
-    throw error
+    // On ne jette plus l'erreur pour éviter de faire planter l'application
+    // On retourne une chaîne vide ou un message d'erreur gracieux
+    return ""
   }
 }
 
@@ -42,6 +45,8 @@ export async function callAIJSON<T>(params: {
       ...params,
       jsonMode: true,
     })
+
+    if (!text) return params.fallback
 
     // Nettoyer les éventuels backticks markdown
     const cleaned = text

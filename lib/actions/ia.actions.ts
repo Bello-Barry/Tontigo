@@ -179,7 +179,7 @@ export async function getDashboardInsights(): Promise<ActionResult<AIInsight[]>>
 
   try {
     const { text } = await generateText({
-      model: google('gemini-2.0-flash-001'),
+      model: google('gemini-1.5-flash'),
       prompt: prompt,
     })
 
