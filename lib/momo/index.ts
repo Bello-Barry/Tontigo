@@ -82,10 +82,10 @@ export async function requestToPay(params: {
       'Authorization': `Bearer ${token}`,
       'X-Reference-Id': referenceId,
       'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY,
+      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY || '',
       'Content-Type': 'application/json',
-      ...(CALLBACK_HOST && { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/collection` })
-    },
+      ...(CALLBACK_HOST ? { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/collection` } : {})
+    } as Record<string, string>,
     body: JSON.stringify({
       amount: params.amount.toString(),
       currency: 'EUR', // Sandbox only supports EUR
@@ -121,8 +121,8 @@ export async function getCollectionStatus(referenceId: string): Promise<any> {
     headers: {
       'Authorization': `Bearer ${token}`,
       'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY
-    },
+      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY || ''
+    } as Record<string, string>,
     cache: 'no-store'
   })
 
@@ -153,10 +153,10 @@ export async function transfer(params: {
       'Authorization': `Bearer ${token}`,
       'X-Reference-Id': referenceId,
       'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': DISB_SUB_KEY,
+      'Ocp-Apim-Subscription-Key': DISB_SUB_KEY || '',
       'Content-Type': 'application/json',
-      ...(CALLBACK_HOST && { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/disbursement` })
-    },
+      ...(CALLBACK_HOST ? { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/disbursement` } : {})
+    } as Record<string, string>,
     body: JSON.stringify({
       amount: params.amount.toString(),
       currency: 'EUR', // Sandbox only supports EUR
@@ -192,8 +192,8 @@ export async function getDisbursementStatus(referenceId: string): Promise<any> {
     headers: {
       'Authorization': `Bearer ${token}`,
       'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': DISB_SUB_KEY
-    },
+      'Ocp-Apim-Subscription-Key': DISB_SUB_KEY || ''
+    } as Record<string, string>,
     cache: 'no-store'
   })
 
