@@ -1,4 +1,4 @@
-import { streamText } from 'ai'
+import { streamText, convertToCoreMessages } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
@@ -7,7 +7,6 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 })
 
-// ─── Base de connaissances Likelemba (RAG simplifié) ────────────────────────
 const LIKELEMBA_KNOWLEDGE = `
 ## Règles et fonctionnement de la plateforme Likelemba
 
@@ -43,28 +42,12 @@ const LIKELEMBA_KNOWLEDGE = `
 ### Code d'invitation
 - Chaque groupe a un code d'invitation unique (ex: 29c100e8).
 - Partager ce code permet à d'autres membres de rejoindre le groupe.
-
-### Conseils financiers généraux
-- Commencer petit (5,000 - 10,000 FCFA) pour apprendre le système avant de s'engager sur de grandes sommes.
-- Toujours vérifier la date de son prochain tour pour ne pas rater un versement.
-- Utiliser le Coffre-Fort pour les objectifs à long terme plutôt que de garder l'argent dans le portefeuille.
-- Diversifier : participer à plusieurs petites tontines plutôt qu'une grande.
 `
 
-const BASE_SYSTEM = `Tu es le "Coach Likelemba", l'assistant d'intelligence artificielle de l'application Likelemba — une plateforme d'épargne collaborative pour les Africains francophones, notamment au Congo-Brazzaville.
-
-Ton rôle :
-- Aider les utilisateurs à comprendre et utiliser la plateforme.
-- Donner des conseils financiers pratiques et adaptés au contexte africain.
-- Encourager les bonnes habitudes d'épargne et de ponctualité.
-
-Règles de comportement :
-- Sois chaleureux, encourageant, et CONCIS (max 200 mots sauf si l'utilisateur demande plus de détails).
-- Utilise un français simple et accessible, sans jargon complexe.
-- Tu peux glisser quelques mots locaux avec modération : "Mbote !" (bonjour en lingala), "Ko luka" (chercher), "Makasi" (fort/courageux).
-- N'engage jamais ta responsabilité légale sur des conseils d'investissement — dis "C'est un conseil personnel, consulte un expert financier pour les grandes décisions."
-- Si on te demande qui t'a créé, réponds : "L'équipe d'ingénierie de Likelemba, propulsée par Gemini IA de Google."
-- Formate tes réponses avec du Markdown : utilise le gras, les listes à puces, les titres. C'est maintenant rendu proprement dans l'interface.
+const BASE_SYSTEM = `Tu es le "Coach Likelemba", l'assistant d'intelligence artificielle de l'application Likelemba.
+Ton rôle est d'aider les utilisateurs à comprendre la plateforme et de donner des conseils financiers adaptés au contexte africain.
+Sois chaleureux, encourageant et concis.
+Utilise quelques mots locaux comme "Mbote !" ou "Makasi".
 
 ${LIKELEMBA_KNOWLEDGE}`
 
@@ -83,73 +66,28 @@ export async function POST(req: Request) {
       return new Response('Message vide', { status: 400 })
     }
 
-    const userId = user.id
+    // Récupération rapide du profil pour le contexte
+    const { data: profile } = await serviceClient
+      .from('users')
+      .select('full_name, trust_score')
+      .eq('id', user.id)
+      .single()
 
-    // ─── Récupération du profil utilisateur (resilient) ───────────────────
-    const [profileResult, membershipsResult, walletResult] = await Promise.allSettled([
-      serviceClient
-        .from('users')
-        .select('full_name, trust_score, badge, total_groups_completed')
-        .eq('id', userId)
-        .single(),
-      serviceClient
-        .from('memberships')
-        .select('tontine_groups(name, amount, frequency, status)')
-        .eq('user_id', userId)
-        .limit(5),
-      serviceClient
-        .from('virtual_wallet')
-        .select('total_balance')
-        .eq('user_id', userId)
-        .single(),
-    ])
-
-    const profile    = profileResult.status    === 'fulfilled' ? profileResult.value.data    : null
-    const memberships= membershipsResult.status === 'fulfilled' ? membershipsResult.value.data : []
-    const wallet     = walletResult.status      === 'fulfilled' ? walletResult.value.data      : null
-
-    const activeTontineNames = (memberships || [])
-      .map((t: any) => t.tontine_groups?.name)
-      .filter(Boolean)
-      .join(', ')
-
-    const userContext = `
-## Profil de l'utilisateur que tu conseilles en ce moment :
-- **Nom** : ${profile?.full_name || 'Utilisateur'}
-- **Trust Score** : ${profile?.trust_score ?? 'N/A'}/100 ${
-      profile?.trust_score >= 80 ? '(Excellent ⭐)' :
-      profile?.trust_score >= 50 ? '(Bon 👍)' :
-      profile?.trust_score !== undefined ? '(À améliorer 💪)' : ''
-    }
-- **Badge** : ${profile?.badge || 'nouveau'}
-- **Groupes complétés avec succès** : ${profile?.total_groups_completed ?? 0}
-- **Solde portefeuille** : ${wallet?.total_balance?.toLocaleString('fr-FR') ?? 'N/A'} FCFA
-- **Tontines actives** : ${activeTontineNames || 'Aucune pour le moment'}
-
-Utilise ces informations pour personnaliser tes conseils. Mentionne son prénom si approprié.`
-
-    const systemPrompt = BASE_SYSTEM + '\n\n' + userContext
-
-    const coreMessages = [
-      ...history.map((m: any) => ({
-        role: m.role,
-        content: m.content || '',
-      })),
-      { role: 'user', content: message.trim() },
-    ]
+    const userContext = `Utilisateur actuel : ${profile?.full_name || 'Membre'}. Trust Score : ${profile?.trust_score || 'N/A'}/100.`
 
     const result = streamText({
       model: google('gemini-1.5-flash'),
-      system: systemPrompt,
-      messages: coreMessages,
-      temperature: 0.7,
-      maxOutputTokens: 1500,
+      system: `${BASE_SYSTEM}\n\n${userContext}`,
+      messages: convertToCoreMessages([
+        ...history,
+        { role: 'user', content: message.trim() }
+      ]),
       onFinish: async (event) => {
         const fullReply = event.text
         let targetId = conversationId
 
         if (!targetId) {
-          const title = message.slice(0, 60) + (message.length > 60 ? '...' : '')
+          const title = message.slice(0, 60)
           const { data: conv } = await serviceClient
             .from('ai_conversations')
             .insert({ user_id: user.id, title })
@@ -163,18 +101,13 @@ Utilise ces informations pour personnaliser tes conseils. Mentionne son prénom 
             { conversation_id: targetId, role: 'user', content: message.trim() },
             { conversation_id: targetId, role: 'assistant', content: fullReply }
           ])
-
-          await serviceClient
-            .from('ai_conversations')
-            .update({ updated_at: new Date().toISOString() })
-            .eq('id', targetId)
         }
       }
     })
 
     return result.toTextStreamResponse()
-  } catch (error) {
-    console.error("Erreur API IA Stream:", error)
-    return new Response('Une erreur est survenue', { status: 500 })
+  } catch (error: any) {
+    console.error("AI Stream Error:", error)
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 })
   }
 }
