@@ -1,6 +1,6 @@
 # Guide de Maîtrise du Backend Likelemba 🚀
 
-Ce guide est conçu pour t'aider à comprendre et maîtriser l'architecture backend de ton application Likelemba. Il couvre la base de données, la logique métier et l'intégration des paiements mobiles (MTN & Airtel).
+Ce guide est conçu pour t'aider à comprendre et maîtriser l'architecture backend de ton application Likelemba. Il couvres la base de données, la logique métier et l'intégration des paiements mobiles (MTN & Airtel).
 
 ## 1. Architecture Globale
 
