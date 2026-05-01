@@ -4,19 +4,23 @@ const BASE_URL = process.env.MTN_MOMO_BASE_URL || 'https://sandbox.momodeveloper
 const ENV = process.env.MTN_MOMO_ENV || 'sandbox'
 
 // Collection Config
-const COLL_SUB_KEY = process.env.MOMO_COLLECTION_SUBSCRIPTION_KEY!
-const COLL_USER_ID = process.env.MOMO_COLLECTION_API_USER_ID!
-const COLL_API_KEY = process.env.MOMO_COLLECTION_API_KEY!
+const COLL_SUB_KEY = process.env.MOMO_COLLECTION_SUBSCRIPTION_KEY
+const COLL_USER_ID = process.env.MOMO_COLLECTION_API_USER_ID
+const COLL_API_KEY = process.env.MOMO_COLLECTION_API_KEY
 
 // Disbursement Config
-const DISB_SUB_KEY = process.env.MOMO_DISBURSEMENT_SUBSCRIPTION_KEY!
-const DISB_USER_ID = process.env.MOMO_DISBURSEMENT_API_USER_ID!
-const DISB_API_KEY = process.env.MOMO_DISBURSEMENT_API_KEY!
+const DISB_SUB_KEY = process.env.MOMO_DISBURSEMENT_SUBSCRIPTION_KEY
+const DISB_USER_ID = process.env.MOMO_DISBURSEMENT_API_USER_ID
+const DISB_API_KEY = process.env.MOMO_DISBURSEMENT_API_KEY
  
- // Callback Config — Use production URL on Vercel, fallback to MOMO_CALLBACK_HOST or VERCEL_URL
- const CALLBACK_HOST = process.env.MOMO_CALLBACK_HOST 
-   || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
-   || process.env.NEXT_PUBLIC_APP_URL
+// Callback Config — Prioritize manual override, then Vercel's internal URL, then APP_URL
+const getCallbackHost = () => {
+  if (process.env.MOMO_CALLBACK_HOST) return process.env.MOMO_CALLBACK_HOST
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  return process.env.NEXT_PUBLIC_APP_URL
+}
+
+const CALLBACK_HOST = getCallbackHost()
 
 /**
  * Génère un token d'accès pour un produit spécifique (collection ou disbursement)
@@ -27,7 +31,9 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
   const subKey = product === 'collection' ? COLL_SUB_KEY : DISB_SUB_KEY
 
   if (!userId || !apiKey || !subKey) {
-    throw new Error(`Missing configuration for ${product}`)
+    const errorMsg = `Configuration manquante pour ${product}. Vérifiez les variables d'environnement Vercel (Subscription Key, User ID, API Key).`
+    console.error(errorMsg)
+    throw new Error(errorMsg)
   }
 
   const auth = Buffer.from(`${userId}:${apiKey}`).toString('base64')

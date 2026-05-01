@@ -1,8 +1,14 @@
 import { streamText } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
+const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+
+if (!apiKey) {
+  console.warn("ATTENTION: GOOGLE_GENERATIVE_AI_API_KEY est manquante dans les variables d'environnement.")
+}
+
 const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+  apiKey: apiKey || '',
 })
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
@@ -81,6 +87,11 @@ export async function POST(req: Request) {
 
     if (!message?.trim()) {
       return new Response('Message vide', { status: 400 })
+    }
+
+    if (!apiKey) {
+      console.error("Erreur IA: Clé API manquante. Vérifiez vos variables d'environnement Vercel.")
+      return new Response('Le service IA n\'est pas configuré. Veuillez contacter l\'administrateur.', { status: 503 })
     }
 
     // Use actual user.id
