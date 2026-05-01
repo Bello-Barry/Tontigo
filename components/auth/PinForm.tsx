@@ -41,7 +41,13 @@ export function PinForm({ title, description, onSubmit, loading, error }: PinFor
   const isComplete = pin.every(d => d !== '')
 
   return (
-    <div className="space-y-6">
+    <form 
+      onSubmit={(e) => {
+        e.preventDefault()
+        handleConfirm()
+      }}
+      className="space-y-6"
+    >
       <div className="text-center space-y-1">
         <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Lock className="w-6 h-6 text-emerald-400" />
@@ -62,6 +68,7 @@ export function PinForm({ title, description, onSubmit, loading, error }: PinFor
             value={digit}
             onChange={e => handleChange(i, e.target.value)}
             onKeyDown={e => handleKeyDown(i, e)}
+            autoComplete={i === 0 ? "current-password" : "off"}
             className="
               w-14 h-16 text-center text-2xl font-bold
               bg-slate-800 border-2 border-slate-700
@@ -88,12 +95,12 @@ export function PinForm({ title, description, onSubmit, loading, error }: PinFor
       )}
 
       <Button
-        onClick={handleConfirm}
+        type="submit"
         disabled={!isComplete || loading}
         className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold disabled:opacity-40"
       >
         {loading ? 'Chargement...' : 'Confirmer'}
       </Button>
-    </div>
+    </form>
   )
 }

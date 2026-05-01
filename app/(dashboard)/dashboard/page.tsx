@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { getWalletData } from '@/lib/actions/wallet.actions'
 import { DashboardCharts } from '@/components/shared/DashboardCharts'
+import { DashboardAIInsights } from '@/components/shared/DashboardAIInsights'
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
@@ -113,6 +114,9 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Intelligence Artificielle */}
+      <DashboardAIInsights />
 
       {/* Graphiques Financiers */}
       <DashboardCharts transactions={transactions || []} />

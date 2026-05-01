@@ -5,6 +5,7 @@ import { payContribution, verifyContributionPayment } from '@/lib/actions/tontin
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Loader2, Wallet } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { WalletSelector } from '@/components/shared/WalletSelector'
 import { formatFCFA } from '@/lib/utils/format'
 import type { Contribution } from '@/lib/types'

@@ -3,6 +3,16 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
 import type { ActionResult } from '@/lib/types'
+import { generateText } from 'ai'
+import { google } from '@ai-sdk/google'
+
+export interface AIInsight {
+  id: string
+  title: string
+  content: string
+  type: 'tip' | 'milestone' | 'alert'
+  icon?: string
+}
 
 export interface AIConversation {
   id: string
@@ -18,8 +28,7 @@ export interface AIMessage {
 export async function saveAIConversation(
   conversationId: string | null,
   userMessage: string,
-  aiReply: string,
-  currentHistory: AIMessage[]
+  aiReply: string
 ): Promise<ActionResult<{ conversationId: string }>> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -134,4 +143,60 @@ export async function deleteAllAIConversations(): Promise<ActionResult> {
 
   if (error) return { error: error.message }
   return { success: true }
+}
+
+export async function getDashboardInsights(): Promise<ActionResult<AIInsight[]>> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
+
+  // 1. Récupérer les données critiques
+  const [profileRes, walletRes, transRes] = await Promise.all([
+    supabase.from('users').select('*').eq('id', user.id).single(),
+    supabase.from('virtual_wallet').select('*').eq('user_id', user.id).single(),
+    supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5)
+  ])
+
+  const profile = profileRes.data
+  const wallet = walletRes.data
+  const transactions = transRes.data || []
+
+  // 2. Préparer le prompt pour Gemini
+  const prompt = `Analyse les données financières suivantes d'un utilisateur de Likelemba (plateforme d'épargne) et génère exactement 3 conseils/insights courts (max 15 mots par conseil).
+  
+  Données :
+  - Trust Score: ${profile?.trust_score}/100
+  - Badge: ${profile?.badge}
+  - Solde Portefeuille: ${wallet?.total_balance} FCFA
+  - Dernières transactions: ${transactions.map(t => `${t.type}: ${t.amount}`).join(', ')}
+
+  Génère une réponse JSON valide au format suivant : 
+  [
+    {"id": "1", "title": "...", "content": "...", "type": "tip|milestone|alert", "icon": "lucide-icon-name"}
+  ]
+  Les types : 'tip' (conseil), 'milestone' (succès/badge), 'alert' (danger/attention).
+  Réponds UNIQUEMENT le JSON.`
+
+  try {
+    const { text } = await generateText({
+      model: google('gemini-2.0-flash-001'),
+      prompt: prompt,
+    })
+
+    // Nettoyer la réponse si l'IA ajoute des blocs de code markdown
+    const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim()
+    const insights = JSON.parse(jsonStr) as AIInsight[]
+
+    return { data: insights, success: true }
+  } catch (error) {
+    console.error('Erreur Insights IA:', error)
+    // Fallback static en cas d'erreur
+    return { 
+      data: [
+        { id: 'f1', title: 'Astuce du jour', content: 'Économisez 10% de vos gains tontine dans un coffre bloqué.', type: 'tip' },
+        { id: 'f2', title: 'Objectif Badge', content: 'Complétez une autre tontine pour passer au badge Expert !', type: 'milestone' }
+      ], 
+      success: true 
+    }
+  }
 }

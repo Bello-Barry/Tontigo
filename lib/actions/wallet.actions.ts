@@ -152,7 +152,7 @@ export async function withdrawFromWallet(params: {
         const referenceId = await momoTransfer({
           amount: netAmount,
           phone: destPhone,
-          externalId: referenceId, // UUID pour le callback
+          externalId: user.id,
           payerMessage: `Retrait Tontigo`,
           payeeNote: `Retrait Portefeuille`
         })

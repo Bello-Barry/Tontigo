@@ -64,7 +64,7 @@ export async function depositToVault(
       const referenceId = await requestToPay({
         amount: input.amount,
         phone: phoneToUse,
-        externalId: referenceId, // UUID pour le callback
+        externalId: vaultId,
         payerMessage: `Épargne Tontigo - ${vault.name}`,
         payeeNote: 'Tontigo'
       })
