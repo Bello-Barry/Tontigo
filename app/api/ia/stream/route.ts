@@ -1,9 +1,8 @@
 import { streamText } from 'ai'
-import { createOpenAI } from '@ai-sdk/openai'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
-const openrouter = createOpenAI({
-  baseURL: process.env.OPENAI_API_BASE || 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENAI_API_KEY,
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 })
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
@@ -146,7 +145,7 @@ Utilise ces informations pour personnaliser tes conseils. Mentionne son prénom 
     
     // ─── Appel au modèle ───────────────────────────────────────────────────
     const result = streamText({
-      model: openrouter('google/gemini-2.0-flash-001'),
+      model: google('gemini-2.0-flash'),
       system: systemPrompt,
       messages: coreMessages,
       temperature: 0.7,

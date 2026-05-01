@@ -13,8 +13,10 @@ const DISB_SUB_KEY = process.env.MOMO_DISBURSEMENT_SUBSCRIPTION_KEY!
 const DISB_USER_ID = process.env.MOMO_DISBURSEMENT_API_USER_ID!
 const DISB_API_KEY = process.env.MOMO_DISBURSEMENT_API_KEY!
  
- // Callback Config
- const CALLBACK_HOST = process.env.MOMO_CALLBACK_HOST
+ // Callback Config — Use production URL on Vercel, fallback to MOMO_CALLBACK_HOST or VERCEL_URL
+ const CALLBACK_HOST = process.env.MOMO_CALLBACK_HOST 
+   || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
+   || process.env.NEXT_PUBLIC_APP_URL
 
 /**
  * Génère un token d'accès pour un produit spécifique (collection ou disbursement)
