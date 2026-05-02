@@ -21,7 +21,7 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
   const apiKey = product === 'collection' ? COLL_API_KEY : DISB_API_KEY
   const subKey = product === 'collection' ? COLL_SUB_KEY : DISB_SUB_KEY
 
-  if (!userId || !apiKey || !subKey) throw new Error(`MoMo config missing for ${product}`)
+  if (!userId || !apiKey || !subKey) throw new Error(`MoMo config incomplete for ${product}`)
 
   const auth = Buffer.from(`${userId}:${apiKey}`).toString('base64')
 
@@ -30,12 +30,18 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
     headers: {
       'Ocp-Apim-Subscription-Key': subKey,
       'Authorization': `Basic ${auth}`,
-      'Content-Length': '0'
+      'Content-Length': '0',
+      'Accept': 'application/json'
     },
-    cache: 'no-store'
+    cache: 'no-store',
+    signal: AbortSignal.timeout(8000) // 8s pour rester sous les 10s de Vercel Hobby
   })
 
-  if (!response.ok) throw new Error(`MoMo Token Error: ${response.status}`)
+  if (!response.ok) {
+     const txt = await response.text()
+     console.error(`MoMo Token Error (${product}):`, response.status, txt)
+     throw new Error(`MoMo Auth failed: ${response.status}`)
+  }
   const data = await response.json()
   return data.access_token
 }
@@ -51,7 +57,7 @@ export async function requestToPay(params: {
   const referenceId = crypto.randomUUID()
   const cleanPhone = params.phone.replace('+', '').trim()
 
-  // IMPORTANT: Ericsson MoMo API limits externalId to 20 chars
+  // Limite Ericsson 20 chars, alphanumeric
   const safeExternalId = params.externalId.replace(/-/g, '').slice(0, 20)
 
   const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay`, {
@@ -62,6 +68,7 @@ export async function requestToPay(params: {
       'X-Target-Environment': ENV,
       'Ocp-Apim-Subscription-Key': COLL_SUB_KEY,
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...(CALLBACK_HOST && { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/collection` })
     },
     body: JSON.stringify({
@@ -72,10 +79,11 @@ export async function requestToPay(params: {
       payerMessage: params.payerMessage.slice(0, 80),
       payeeNote: params.payeeNote.slice(0, 80)
     }),
-    cache: 'no-store'
+    cache: 'no-store',
+    signal: AbortSignal.timeout(8000)
   })
 
-  if (response.status !== 202) throw new Error(`MoMo RequestToPay: ${response.status}`)
+  if (response.status !== 202) throw new Error(`MoMo requestToPay error: ${response.status}`)
   return referenceId
 }
 
@@ -99,6 +107,7 @@ export async function transfer(params: {
       'X-Target-Environment': ENV,
       'Ocp-Apim-Subscription-Key': DISB_SUB_KEY,
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...(CALLBACK_HOST && { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/disbursement` })
     },
     body: JSON.stringify({
@@ -109,10 +118,11 @@ export async function transfer(params: {
       payerMessage: params.payerMessage.slice(0, 80),
       payeeNote: params.payeeNote.slice(0, 80)
     }),
-    cache: 'no-store'
+    cache: 'no-store',
+    signal: AbortSignal.timeout(8000)
   })
 
-  if (response.status !== 202) throw new Error(`MoMo Transfer: ${response.status}`)
+  if (response.status !== 202) throw new Error(`MoMo transfer error: ${response.status}`)
   return referenceId
 }
 
@@ -123,10 +133,13 @@ export async function getCollectionStatus(referenceId: string) {
     headers: {
       'Authorization': `Bearer ${token}`,
       'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY
+      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY,
+      'Accept': 'application/json'
     },
-    cache: 'no-store'
+    cache: 'no-store',
+    signal: AbortSignal.timeout(5000)
   })
+  if (!res.ok) throw new Error(`MoMo Status Error: ${res.status}`)
   return res.json()
 }
 
@@ -137,9 +150,12 @@ export async function getDisbursementStatus(referenceId: string) {
     headers: {
       'Authorization': `Bearer ${token}`,
       'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': DISB_SUB_KEY
+      'Ocp-Apim-Subscription-Key': DISB_SUB_KEY,
+      'Accept': 'application/json'
     },
-    cache: 'no-store'
+    cache: 'no-store',
+    signal: AbortSignal.timeout(5000)
   })
+  if (!res.ok) throw new Error(`MoMo Status Error: ${res.status}`)
   return res.json()
 }
