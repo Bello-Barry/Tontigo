@@ -21,7 +21,7 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
   const apiKey = product === 'collection' ? COLL_API_KEY : DISB_API_KEY
   const subKey = product === 'collection' ? COLL_SUB_KEY : DISB_SUB_KEY
 
-  if (!userId || !apiKey || !subKey) throw new Error(`Missing MoMo config for ${product}`)
+  if (!userId || !apiKey || !subKey) throw new Error(`MoMo config missing for ${product}`)
 
   const auth = Buffer.from(`${userId}:${apiKey}`).toString('base64')
 
@@ -51,11 +51,8 @@ export async function requestToPay(params: {
   const referenceId = crypto.randomUUID()
   const cleanPhone = params.phone.replace('+', '').trim()
 
-  // IMPORTANT: externalId must be max 20 chars for some MoMo APIs
-  // If it's a UUID, we take the last 20 chars or a hash
-  const safeExternalId = params.externalId.length > 20
-    ? params.externalId.replace(/-/g, '').slice(-20)
-    : params.externalId
+  // IMPORTANT: Ericsson MoMo API limits externalId to 20 chars
+  const safeExternalId = params.externalId.replace(/-/g, '').slice(0, 20)
 
   const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay`, {
     method: 'POST',
@@ -92,9 +89,7 @@ export async function transfer(params: {
   const token = await getToken('disbursement')
   const referenceId = crypto.randomUUID()
   const cleanPhone = params.phone.replace('+', '').trim()
-  const safeExternalId = params.externalId.length > 20
-    ? params.externalId.replace(/-/g, '').slice(-20)
-    : params.externalId
+  const safeExternalId = params.externalId.replace(/-/g, '').slice(0, 20)
 
   const response = await fetch(`${BASE_URL}/disbursement/v1_0/transfer`, {
     method: 'POST',
