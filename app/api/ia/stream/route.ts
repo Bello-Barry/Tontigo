@@ -1,10 +1,13 @@
 import { streamText } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
+export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
+
 const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
 
 if (!apiKey) {
-  console.warn("ATTENTION: GOOGLE_GENERATIVE_AI_API_KEY est manquante dans les variables d'environnement.")
+  console.warn("DEBUG IA: GOOGLE_GENERATIVE_AI_API_KEY est manquante dans les variables d'environnement.")
 }
 
 const google = createGoogleGenerativeAI({
