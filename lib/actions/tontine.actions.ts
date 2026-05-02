@@ -222,7 +222,7 @@ export async function payContribution(
       const referenceId = await requestToPay({
         amount: contribution.amount,
         phone: phoneToUse,
-        externalId: contribution.id,
+        externalId: contribution.id.slice(0, 20),
         payerMessage: `Cotisation Tontigo - ${contributionId.slice(0, 6)}`,
         payeeNote: 'Tontigo'
       })
@@ -276,7 +276,7 @@ export async function payContribution(
     return { data: { reference: paymentRef }, success: true }
   } catch (err: any) {
     console.error('payContribution error:', err)
-    return { error: 'Erreur lors du paiement' }
+    return { error: `Erreur lors du paiement: ${err.message || 'Erreur inconnue'}` }
   }
 }
 

@@ -153,7 +153,7 @@ export async function withdrawFromWallet(params: {
         const referenceId = await momoTransfer({
           amount: netAmount,
           phone: destPhone,
-          externalId: crypto.randomUUID(),
+          externalId: crypto.randomUUID().slice(0, 20),
           payerMessage: `Retrait Tontigo`,
           payeeNote: `Retrait Portefeuille`
         })
@@ -190,7 +190,7 @@ export async function withdrawFromWallet(params: {
         return { data: { reference: referenceId, netAmount }, success: true }
       } catch (err: any) {
         console.error('MTN Transfer error:', err)
-        return { error: 'Échec de la transaction MTN. Réessaye plus tard.' }
+        return { error: `Échec de la transaction MTN: ${err.message || 'Erreur inconnue'}` }
       }
     }
 

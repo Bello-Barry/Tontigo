@@ -4,50 +4,50 @@ import { serviceClient } from '@/lib/supabase/service'
 export async function POST(request: Request) {
   try {
     const payload = await request.json()
-    // Validation du payload...
-    const { externalId, status, amount } = payload
+    const { externalId, status, amount, financialTransactionId } = payload
 
     if (!externalId) {
       return NextResponse.json({ error: 'Missing externalId' }, { status: 400 })
     }
 
-    if (externalId.startsWith('TG-COT-')) {
-      // Traitement cotisation
-      const contributionId = externalId.split('-')[2] 
-      
-      if (status === 'SUCCESSFUL') {
-        const { data: contrib } = await serviceClient
-          .from('contributions')
-          .select('membership_id, group_id, amount')
-          .eq('id', contributionId)
-          .single()
+    if (status === 'SUCCESSFUL') {
+      // On utilise une recherche flexible par externalId car il peut être tronqué (20 chars)
+      const { data: contribution } = await serviceClient
+        .from('contributions')
+        .select('*, memberships(total_paid, user_id)')
+        .or(`payment_reference.eq.${externalId},id.ilike.%${externalId}%`)
+        .maybeSingle()
 
-        if (contrib) {
-          await serviceClient.from('contributions').update({
-            status: 'paye',
-            paid_at: new Date().toISOString(),
-          }).eq('id', contributionId)
+      if (contribution && contribution.status !== 'paye') {
+        const membership = contribution.memberships as any
 
-          const { data: membership } = await serviceClient
-            .from('memberships')
-            .select('total_paid')
-            .eq('id', contrib.membership_id)
-            .single()
+        await serviceClient.from('contributions').update({
+          status:            'paye',
+          paid_at:           new Date().toISOString(),
+          payment_reference: financialTransactionId || externalId
+        }).eq('id', contribution.id)
 
-          if (membership) {
-            await serviceClient.from('memberships').update({
-              total_paid: Number(membership.total_paid) + Number(contrib.amount)
-            }).eq('id', contrib.membership_id)
-          }
+        await serviceClient.from('memberships').update({
+          total_paid: Number(membership.total_paid) + Number(amount),
+        }).eq('id', contribution.membership_id)
 
-          // Vérifier si le tour est fini et déclencher le payout
-          const { checkPayoutsStatus } = await import('@/lib/actions/tontine.actions')
-          await checkPayoutsStatus(contrib.group_id).catch(console.error)
-        }
+        const { checkPayoutsStatus } = await import('@/lib/actions/tontine.actions')
+        await checkPayoutsStatus(contribution.group_id).catch(console.error)
       }
-    } else if (externalId.startsWith('LK-WALLET-')) {
-        // Traitement retrait portefeuille (disbursement callback)
-        // Logique à implémenter selon le retour MTN
+
+      // Recherche transaction générale
+      const { data: transaction } = await serviceClient
+        .from('transactions')
+        .select('*')
+        .or(`external_reference.eq.${externalId},id.ilike.%${externalId}%`)
+        .maybeSingle()
+
+      if (transaction && transaction.status === 'pending') {
+        await serviceClient.from('transactions').update({
+          status: 'success',
+          external_reference: financialTransactionId || externalId
+        }).eq('id', transaction.id)
+      }
     }
 
     return NextResponse.json({ received: true })

@@ -64,7 +64,7 @@ export async function depositToVault(
       const referenceId = await requestToPay({
         amount: input.amount,
         phone: phoneToUse,
-        externalId: vaultId,
+        externalId: vaultId.slice(0, 20),
         payerMessage: `Épargne Tontigo - ${vault.name}`,
         payeeNote: 'Tontigo'
       })
@@ -84,7 +84,7 @@ export async function depositToVault(
       return { data: { reference: referenceId }, success: true }
     } catch (err: any) {
       console.error('MoMo requestToPay error:', err)
-      return { error: 'Erreur lors de l\'initiation du paiement MoMo' }
+      return { error: `Erreur MoMo: ${err.message || 'Erreur inconnue'}` }
     }
   }
 

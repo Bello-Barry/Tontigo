@@ -16,34 +16,48 @@ const CALLBACK_HOST = process.env.MOMO_CALLBACK_HOST
    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
    || process.env.NEXT_PUBLIC_APP_URL
 
+async function handleMoMoError(res: Response, context: string) {
+  const body = await res.text()
+  let detail = `Status ${res.status}`
+  try {
+    const json = JSON.parse(body)
+    detail = json.message || json.code || json.error || body.slice(0, 100)
+  } catch {
+    detail = body.slice(0, 100) || detail
+  }
+  console.error(`MoMo Error [${context}]:`, res.status, body)
+  return new Error(`MoMo ${context}: ${detail}`)
+}
+
 async function getToken(product: 'collection' | 'disbursement'): Promise<string> {
   const userId = product === 'collection' ? COLL_USER_ID : DISB_USER_ID
   const apiKey = product === 'collection' ? COLL_API_KEY : DISB_API_KEY
   const subKey = product === 'collection' ? COLL_SUB_KEY : DISB_SUB_KEY
 
-  if (!userId || !apiKey || !subKey) throw new Error(`MoMo config incomplete for ${product}`)
+  if (!userId || !apiKey || !subKey) throw new Error(`Clés MoMo ${product} manquantes`)
 
   const auth = Buffer.from(`${userId}:${apiKey}`).toString('base64')
 
-  const response = await fetch(`${BASE_URL}/${product}/token/`, {
-    method: 'POST',
-    headers: {
-      'Ocp-Apim-Subscription-Key': subKey,
-      'Authorization': `Basic ${auth}`,
-      'Content-Length': '0',
-      'Accept': 'application/json'
-    },
-    cache: 'no-store',
-    signal: AbortSignal.timeout(8000) // 8s pour rester sous les 10s de Vercel Hobby
-  })
+  try {
+    const response = await fetch(`${BASE_URL}/${product}/token/`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': subKey,
+        'Authorization': `Basic ${auth}`,
+        'Content-Length': '0',
+        'Accept': 'application/json'
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(10000)
+    })
 
-  if (!response.ok) {
-     const txt = await response.text()
-     console.error(`MoMo Token Error (${product}):`, response.status, txt)
-     throw new Error(`MoMo Auth failed: ${response.status}`)
+    if (!response.ok) throw await handleMoMoError(response, 'Auth')
+    const data = await response.json()
+    return data.access_token
+  } catch (err: any) {
+    if (err.name === 'TimeoutError') throw new Error("Délai d'attente MoMo dépassé")
+    throw err
   }
-  const data = await response.json()
-  return data.access_token
 }
 
 export async function requestToPay(params: {
@@ -55,9 +69,8 @@ export async function requestToPay(params: {
 }): Promise<string> {
   const token = await getToken('collection')
   const referenceId = crypto.randomUUID()
-  const cleanPhone = params.phone.replace('+', '').trim()
-
-  // Limite Ericsson 20 chars, alphanumeric
+  // Nettoyage strict : uniquement les chiffres
+  const cleanPhone = params.phone.replace(/\D/g, '').trim()
   const safeExternalId = params.externalId.replace(/-/g, '').slice(0, 20)
 
   const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay`, {
@@ -72,7 +85,7 @@ export async function requestToPay(params: {
       ...(CALLBACK_HOST && { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/collection` })
     },
     body: JSON.stringify({
-      amount: params.amount.toString(),
+      amount: Math.round(params.amount).toString(),
       currency: CURRENCY,
       externalId: safeExternalId,
       payer: { partyIdType: 'MSISDN', partyId: cleanPhone },
@@ -80,10 +93,10 @@ export async function requestToPay(params: {
       payeeNote: params.payeeNote.slice(0, 80)
     }),
     cache: 'no-store',
-    signal: AbortSignal.timeout(8000)
+    signal: AbortSignal.timeout(10000)
   })
 
-  if (response.status !== 202) throw new Error(`MoMo requestToPay error: ${response.status}`)
+  if (response.status !== 202) throw await handleMoMoError(response, 'Payment')
   return referenceId
 }
 
@@ -96,7 +109,7 @@ export async function transfer(params: {
 }): Promise<string> {
   const token = await getToken('disbursement')
   const referenceId = crypto.randomUUID()
-  const cleanPhone = params.phone.replace('+', '').trim()
+  const cleanPhone = params.phone.replace(/\D/g, '').trim()
   const safeExternalId = params.externalId.replace(/-/g, '').slice(0, 20)
 
   const response = await fetch(`${BASE_URL}/disbursement/v1_0/transfer`, {
@@ -111,7 +124,7 @@ export async function transfer(params: {
       ...(CALLBACK_HOST && { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/disbursement` })
     },
     body: JSON.stringify({
-      amount: params.amount.toString(),
+      amount: Math.round(params.amount).toString(),
       currency: CURRENCY,
       externalId: safeExternalId,
       payee: { partyIdType: 'MSISDN', partyId: cleanPhone },
@@ -119,10 +132,10 @@ export async function transfer(params: {
       payeeNote: params.payeeNote.slice(0, 80)
     }),
     cache: 'no-store',
-    signal: AbortSignal.timeout(8000)
+    signal: AbortSignal.timeout(10000)
   })
 
-  if (response.status !== 202) throw new Error(`MoMo transfer error: ${response.status}`)
+  if (response.status !== 202) throw await handleMoMoError(response, 'Transfer')
   return referenceId
 }
 
@@ -139,7 +152,6 @@ export async function getCollectionStatus(referenceId: string) {
     cache: 'no-store',
     signal: AbortSignal.timeout(5000)
   })
-  if (!res.ok) throw new Error(`MoMo Status Error: ${res.status}`)
   return res.json()
 }
 
@@ -156,6 +168,5 @@ export async function getDisbursementStatus(referenceId: string) {
     cache: 'no-store',
     signal: AbortSignal.timeout(5000)
   })
-  if (!res.ok) throw new Error(`MoMo Status Error: ${res.status}`)
   return res.json()
 }

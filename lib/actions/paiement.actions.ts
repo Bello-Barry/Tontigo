@@ -31,12 +31,13 @@ export async function collectPayment(params: {
       })
       return { data: { reference: referenceId }, success: true }
     } else {
+      // Simulation Airtel
       const simulatedRef = `AIRTEL-${Date.now()}`
       return { data: { reference: simulatedRef }, success: true }
     }
   } catch (error: any) {
     console.error('collectPayment error:', error)
-    return { error: error.message || 'Échec du paiement' }
+    return { error: `Échec MoMo: ${error.message || 'Erreur inconnue'}` }
   }
 }
 
@@ -70,7 +71,7 @@ export async function transferFunds(params: {
     }
   } catch (error: any) {
     console.error('transferFunds error:', error)
-    return { error: error.message || 'Échec du transfert' }
+    return { error: `Échec MoMo: ${error.message || 'Erreur inconnue'}` }
   }
 }
 
