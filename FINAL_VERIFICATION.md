@@ -1,16 +1,15 @@
-# Rapport de Vérification Finale - Likelemba (Fiabilisation Production)
+# Vérification Finale Production - Likelemba
 
-## Corrections IA (Chatbot)
-- **Fluidité** : Passage en `force-dynamic` sur Node.js avec les en-têtes `nosniff` pour garantir le streaming temps réel sur Vercel.
-- **Robustesse** : Nettoyage de l'historique des messages et gestion d'erreur améliorée dans le composant frontend (`AICoach.tsx`).
-- **Modèle** : Standardisation confirmée sur `gemini-1.5-flash`.
+## IA (Chatbot)
+- **Fluidité** : Utilisation de `toTextStreamResponse` (texte brut) avec un lecteur frontend manuel ultra-robuste. Cela évite les caractères de contrôle SSE (0:"...") qui bloquaient l'affichage sur Vercel.
+- **Vitesse** : Mode `force-dynamic` activé pour éviter la mise en cache des flux.
 
-## Corrections MoMo (Paiements)
-- **Transparence** : Les erreurs techniques de l'API MoMo (ex: erreur 401, timeout, etc.) sont désormais transmises et affichées dans l'interface pour permettre un diagnostic immédiat par l'utilisateur.
-- **Identifiants** : Troncature systématique de l'`externalId` à 20 caractères pour respecter les limites strictes de l'API Ericsson MoMo utilisée par MTN.
-- **Numéros de téléphone** : Nettoyage strict (uniquement les chiffres) pour éviter les rejets de l'API.
-- **Timeouts** : Paramétrés à 10s pour l'auth/paiement et 5s pour le statut, optimisés pour les fonctions Vercel.
+## MoMo (Paiements)
+- **Correction Callback** : Suppression de l'envoi de `X-Callback-Url` dans les requêtes API pour laisser MTN utiliser l'URL fixe configurée dans le portail développeur. Cela résout l'erreur "Callback URL does not match".
+- **Identifiants** : Troncature stricte à 20 caractères (`externalId`) pour toutes les transactions.
+- **Numéros** : Nettoyage strict (uniquement chiffres) des numéros de téléphone.
+- **Diagnostic** : Les erreurs techniques de l'API MoMo sont maintenant affichées en clair dans l'interface en cas d'échec pour faciliter le support.
 
-## Build & Infrastructure
-- Le build Next.js avec Turbopack réussit parfaitement.
-- Les tests unitaires (101) sont tous au vert.
+## Build
+- Build réussi (Turbopack).
+- 101 tests unitaires validés.

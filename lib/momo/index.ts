@@ -11,21 +11,21 @@ const COLL_API_KEY = process.env.MOMO_COLLECTION_API_KEY!
 const DISB_SUB_KEY = process.env.MOMO_DISBURSEMENT_SUBSCRIPTION_KEY!
 const DISB_USER_ID = process.env.MOMO_DISBURSEMENT_API_USER_ID!
 const DISB_API_KEY = process.env.MOMO_DISBURSEMENT_API_KEY!
- 
+
+// On n'utilise que MOMO_CALLBACK_HOST s'il est explicitement défini.
+// SURTOUT PAS VERCEL_URL qui change à chaque déploiement et cause des erreurs de mismatch.
 const CALLBACK_HOST = process.env.MOMO_CALLBACK_HOST
-   || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
-   || process.env.NEXT_PUBLIC_APP_URL
 
 async function handleMoMoError(res: Response, context: string) {
   const body = await res.text()
+  console.error(`MoMo Error [${context}]:`, res.status, body)
   let detail = `Status ${res.status}`
   try {
     const json = JSON.parse(body)
-    detail = json.message || json.code || json.error || body.slice(0, 100)
+    detail = json.message || json.code || json.error || body.slice(0, 50)
   } catch {
-    detail = body.slice(0, 100) || detail
+    detail = body.slice(0, 50) || detail
   }
-  console.error(`MoMo Error [${context}]:`, res.status, body)
   return new Error(`MoMo ${context}: ${detail}`)
 }
 
@@ -37,27 +37,19 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
   if (!userId || !apiKey || !subKey) throw new Error(`Clés MoMo ${product} manquantes`)
 
   const auth = Buffer.from(`${userId}:${apiKey}`).toString('base64')
+  const response = await fetch(`${BASE_URL}/${product}/token/`, {
+    method: 'POST',
+    headers: {
+      'Ocp-Apim-Subscription-Key': subKey,
+      'Authorization': `Basic ${auth}`,
+      'Content-Length': '0'
+    },
+    cache: 'no-store'
+  })
 
-  try {
-    const response = await fetch(`${BASE_URL}/${product}/token/`, {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': subKey,
-        'Authorization': `Basic ${auth}`,
-        'Content-Length': '0',
-        'Accept': 'application/json'
-      },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(10000)
-    })
-
-    if (!response.ok) throw await handleMoMoError(response, 'Auth')
-    const data = await response.json()
-    return data.access_token
-  } catch (err: any) {
-    if (err.name === 'TimeoutError') throw new Error("Délai d'attente MoMo dépassé")
-    throw err
-  }
+  if (!response.ok) throw await handleMoMoError(response, 'Auth')
+  const data = await response.json()
+  return data.access_token
 }
 
 export async function requestToPay(params: {
@@ -69,21 +61,25 @@ export async function requestToPay(params: {
 }): Promise<string> {
   const token = await getToken('collection')
   const referenceId = crypto.randomUUID()
-  // Nettoyage strict : uniquement les chiffres
   const cleanPhone = params.phone.replace(/\D/g, '').trim()
   const safeExternalId = params.externalId.replace(/-/g, '').slice(0, 20)
 
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${token}`,
+    'X-Reference-Id': referenceId,
+    'X-Target-Environment': ENV,
+    'Ocp-Apim-Subscription-Key': COLL_SUB_KEY,
+    'Content-Type': 'application/json'
+  }
+
+  // Si on envoie le callback, il DOIT être identique à celui configuré dans le portail MTN.
+  if (CALLBACK_HOST) {
+    headers['X-Callback-Url'] = `${CALLBACK_HOST}/api/momo/callback/collection`
+  }
+
   const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'X-Reference-Id': referenceId,
-      'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...(CALLBACK_HOST && { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/collection` })
-    },
+    headers,
     body: JSON.stringify({
       amount: Math.round(params.amount).toString(),
       currency: CURRENCY,
@@ -92,8 +88,7 @@ export async function requestToPay(params: {
       payerMessage: params.payerMessage.slice(0, 80),
       payeeNote: params.payeeNote.slice(0, 80)
     }),
-    cache: 'no-store',
-    signal: AbortSignal.timeout(10000)
+    cache: 'no-store'
   })
 
   if (response.status !== 202) throw await handleMoMoError(response, 'Payment')
@@ -112,17 +107,21 @@ export async function transfer(params: {
   const cleanPhone = params.phone.replace(/\D/g, '').trim()
   const safeExternalId = params.externalId.replace(/-/g, '').slice(0, 20)
 
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${token}`,
+    'X-Reference-Id': referenceId,
+    'X-Target-Environment': ENV,
+    'Ocp-Apim-Subscription-Key': DISB_SUB_KEY,
+    'Content-Type': 'application/json'
+  }
+
+  if (CALLBACK_HOST) {
+    headers['X-Callback-Url'] = `${CALLBACK_HOST}/api/momo/callback/disbursement`
+  }
+
   const response = await fetch(`${BASE_URL}/disbursement/v1_0/transfer`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'X-Reference-Id': referenceId,
-      'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': DISB_SUB_KEY,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...(CALLBACK_HOST && { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/disbursement` })
-    },
+    headers,
     body: JSON.stringify({
       amount: Math.round(params.amount).toString(),
       currency: CURRENCY,
@@ -131,8 +130,7 @@ export async function transfer(params: {
       payerMessage: params.payerMessage.slice(0, 80),
       payeeNote: params.payeeNote.slice(0, 80)
     }),
-    cache: 'no-store',
-    signal: AbortSignal.timeout(10000)
+    cache: 'no-store'
   })
 
   if (response.status !== 202) throw await handleMoMoError(response, 'Transfer')
@@ -146,11 +144,9 @@ export async function getCollectionStatus(referenceId: string) {
     headers: {
       'Authorization': `Bearer ${token}`,
       'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY,
-      'Accept': 'application/json'
+      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY
     },
-    cache: 'no-store',
-    signal: AbortSignal.timeout(5000)
+    cache: 'no-store'
   })
   return res.json()
 }
@@ -162,11 +158,9 @@ export async function getDisbursementStatus(referenceId: string) {
     headers: {
       'Authorization': `Bearer ${token}`,
       'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': DISB_SUB_KEY,
-      'Accept': 'application/json'
+      'Ocp-Apim-Subscription-Key': DISB_SUB_KEY
     },
-    cache: 'no-store',
-    signal: AbortSignal.timeout(5000)
+    cache: 'no-store'
   })
   return res.json()
 }

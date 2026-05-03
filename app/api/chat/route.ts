@@ -8,32 +8,16 @@ const google = createGoogleGenerativeAI({
 })
 
 export async function POST(req: Request) {
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    return new Response('Config IA manquante', { status: 500 })
-  }
-
   try {
     const { messages } = await req.json()
     const result = streamText({
       model: google('gemini-1.5-flash'),
-      system: `Tu es le "Coach Likelemba", l'assistant IA de l'application Likelemba.`,
-      messages: messages.map((m: any) => {
-        let content = m.content || ''
-        if (!content && m.parts) {
-          content = m.parts.map((p: any) => p.text || '').join('')
-        }
-        return { role: m.role, content }
-      }),
+      system: `Tu es le "Coach Likelemba".`,
+      messages,
     })
-
-    return result.toTextStreamResponse({
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'X-Content-Type-Options': 'nosniff',
-      }
-    })
+    return result.toTextStreamResponse()
   } catch (error: any) {
     console.error("Chat API Error:", error)
-    return new Response(error.message, { status: 500 })
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 })
   }
 }

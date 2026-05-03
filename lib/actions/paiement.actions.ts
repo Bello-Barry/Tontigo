@@ -2,13 +2,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
 import crypto from 'crypto'
-import { revalidatePath } from 'next/cache'
 import { requestToPay, transfer as momoTransfer, getCollectionStatus, getDisbursementStatus } from '@/lib/momo'
 import type { ActionResult } from '@/lib/types'
 
-/**
- * Encaissement Mobile Money (MTN / Airtel)
- */
 export async function collectPayment(params: {
   amount: number
   phone: string
@@ -30,20 +26,13 @@ export async function collectPayment(params: {
         payeeNote: 'Likelemba'
       })
       return { data: { reference: referenceId }, success: true }
-    } else {
-      // Simulation Airtel
-      const simulatedRef = `AIRTEL-${Date.now()}`
-      return { data: { reference: simulatedRef }, success: true }
     }
+    return { data: { reference: `SIM-${Date.now()}` }, success: true }
   } catch (error: any) {
-    console.error('collectPayment error:', error)
-    return { error: `Échec MoMo: ${error.message || 'Erreur inconnue'}` }
+    return { error: error.message || 'Échec MoMo' }
   }
 }
 
-/**
- * Versement / Retrait Mobile Money
- */
 export async function transferFunds(params: {
   amount: number
   phone: string
@@ -65,30 +54,23 @@ export async function transferFunds(params: {
         payeeNote: 'Likelemba'
       })
       return { data: { reference: referenceId }, success: true }
-    } else {
-      const simulatedRef = `AIRTEL-OUT-${Date.now()}`
-      return { data: { reference: simulatedRef }, success: true }
     }
+    return { data: { reference: `SIM-OUT-${Date.now()}` }, success: true }
   } catch (error: any) {
-    console.error('transferFunds error:', error)
-    return { error: `Échec MoMo: ${error.message || 'Erreur inconnue'}` }
+    return { error: error.message || 'Échec MoMo' }
   }
 }
 
-export async function checkPaymentStatus(referenceId: string): Promise<ActionResult<{ status: string }>> {
+export async function checkPaymentStatus(referenceId: string) {
   try {
     const data = await getCollectionStatus(referenceId)
     return { data: { status: data.status }, success: true }
-  } catch (error: any) {
-    return { error: error.message }
-  }
+  } catch (error: any) { return { error: error.message } }
 }
 
-export async function checkTransferStatus(referenceId: string): Promise<ActionResult<{ status: string }>> {
+export async function checkTransferStatus(referenceId: string) {
   try {
     const data = await getDisbursementStatus(referenceId)
     return { data: { status: data.status }, success: true }
-  } catch (error: any) {
-    return { error: error.message }
-  }
+  } catch (error: any) { return { error: error.message } }
 }
