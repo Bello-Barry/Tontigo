@@ -137,14 +137,9 @@ export function AICoach() {
         const chunk = decoder.decode(value, { stream: true })
         console.log("Chunk reçu:", chunk)
         fullText += chunk
-        setMessages(prev => {
-          const updated = [...prev]
-          const last    = updated.length - 1
-          if (updated[last]?.role === 'assistant') {
-            updated[last] = { ...updated[last], content: fullText }
-          }
-          return updated
-        })
+        setMessages(prev => prev.map(m => 
+          m.id === streamingMsg.id ? { ...m, content: fullText } : m
+        ))
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
       }
 

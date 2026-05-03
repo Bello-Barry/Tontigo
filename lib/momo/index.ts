@@ -89,7 +89,7 @@ export async function requestToPay(params: {
     body: JSON.stringify({
       amount: params.amount.toString(),
       currency: 'EUR', // Sandbox only supports EUR
-      externalId: params.externalId,
+      externalId: referenceId, // Use referenceId as externalId so the callback receives the UUID
       payer: {
         partyIdType: 'MSISDN',
         partyId: params.phone
@@ -160,7 +160,7 @@ export async function transfer(params: {
     body: JSON.stringify({
       amount: params.amount.toString(),
       currency: 'EUR', // Sandbox only supports EUR
-      externalId: params.externalId,
+      externalId: referenceId,
       payee: {
         partyIdType: 'MSISDN',
         partyId: params.phone
