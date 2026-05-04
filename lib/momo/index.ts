@@ -13,6 +13,9 @@ const DISB_SUB_KEY = process.env.MOMO_DISBURSEMENT_SUBSCRIPTION_KEY
 const DISB_USER_ID = process.env.MOMO_DISBURSEMENT_API_USER_ID
 const DISB_API_KEY = process.env.MOMO_DISBURSEMENT_API_KEY
  
+// Cache pour les tokens (mémoire vive - dure le temps de l'instance du serveur)
+const tokenCache: Record<string, { token: string; expiresAt: number }> = {}
+
 // Callback Config — Prioritize manual override, then Vercel's internal URL, then APP_URL
 const getCallbackHost = () => {
   if (process.env.MOMO_CALLBACK_HOST) return process.env.MOMO_CALLBACK_HOST
@@ -22,10 +25,22 @@ const getCallbackHost = () => {
 
 const CALLBACK_HOST = getCallbackHost()
 
+if (CALLBACK_HOST) {
+  console.log("MTN MoMo: Callback Host configuré sur", CALLBACK_HOST)
+} else {
+  console.warn("MTN MoMo: Aucun CALLBACK_HOST détecté. Les paiements ne seront pas mis à jour automatiquement via webhook.")
+}
+
 /**
  * Génère un token d'accès pour un produit spécifique (collection ou disbursement)
  */
 async function getToken(product: 'collection' | 'disbursement'): Promise<string> {
+  // Vérifier le cache
+  const cached = tokenCache[product]
+  if (cached && cached.expiresAt > Date.now() + 60000) { // On prend une marge de 1min
+    return cached.token
+  }
+
   const userId = product === 'collection' ? COLL_USER_ID : DISB_USER_ID
   const apiKey = product === 'collection' ? COLL_API_KEY : DISB_API_KEY
   const subKey = product === 'collection' ? COLL_SUB_KEY : DISB_SUB_KEY
@@ -45,7 +60,6 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
       'Authorization': `Basic ${auth}`,
       'Content-Length': '0'
     },
-    // Next.js caching behavior: disable cache for tokens
     cache: 'no-store'
   })
 
@@ -56,6 +70,13 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
   }
 
   const data = await response.json()
+
+  // Mettre en cache (expires_in est souvent 3600s)
+  tokenCache[product] = {
+    token: data.access_token,
+    expiresAt: Date.now() + (data.expires_in * 1000)
+  }
+
   return data.access_token
 }
 
@@ -72,9 +93,9 @@ export async function requestToPay(params: {
 }): Promise<string> {
   const token = await getToken('collection')
   const referenceId = crypto.randomUUID()
+  const callbackUrl = CALLBACK_HOST ? `${CALLBACK_HOST}/api/momo/callback/collection` : undefined
 
-  // Format the phone to have the correct prefix if needed, usually MSISDN in Sandbox is standard
-  // Example for MTN Sandbox: 46733123453
+  console.log(`MTN MoMo: Initiation requestToPay ${referenceId} pour ${params.phone} (${params.amount} FCFA). Callback: ${callbackUrl || 'AUCUN'}`)
   
   const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay`, {
     method: 'POST',
@@ -84,15 +105,15 @@ export async function requestToPay(params: {
       'X-Target-Environment': ENV,
       'Ocp-Apim-Subscription-Key': COLL_SUB_KEY || '',
       'Content-Type': 'application/json',
-      ...(CALLBACK_HOST ? { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/collection` } : {})
+      ...(callbackUrl ? { 'X-Callback-Url': callbackUrl } : {})
     } as Record<string, string>,
     body: JSON.stringify({
       amount: params.amount.toString(),
       currency: 'EUR', // Sandbox only supports EUR
-      externalId: referenceId, // Use referenceId as externalId so the callback receives the UUID
+      externalId: referenceId, // On passe le referenceId en externalId pour simplifier le callback
       payer: {
         partyIdType: 'MSISDN',
-        partyId: params.phone
+        partyId: params.phone.replace('+', '') // Nettoyage du numéro
       },
       payerMessage: params.payerMessage,
       payeeNote: params.payeeNote
@@ -146,6 +167,9 @@ export async function transfer(params: {
 }): Promise<string> {
   const token = await getToken('disbursement')
   const referenceId = crypto.randomUUID()
+  const callbackUrl = CALLBACK_HOST ? `${CALLBACK_HOST}/api/momo/callback/disbursement` : undefined
+
+  console.log(`MTN MoMo: Initiation transfer ${referenceId} pour ${params.phone} (${params.amount} FCFA). Callback: ${callbackUrl || 'AUCUN'}`)
 
   const response = await fetch(`${BASE_URL}/disbursement/v1_0/transfer`, {
     method: 'POST',
@@ -155,7 +179,7 @@ export async function transfer(params: {
       'X-Target-Environment': ENV,
       'Ocp-Apim-Subscription-Key': DISB_SUB_KEY || '',
       'Content-Type': 'application/json',
-      ...(CALLBACK_HOST ? { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/disbursement` } : {})
+      ...(callbackUrl ? { 'X-Callback-Url': callbackUrl } : {})
     } as Record<string, string>,
     body: JSON.stringify({
       amount: params.amount.toString(),
@@ -163,7 +187,7 @@ export async function transfer(params: {
       externalId: referenceId,
       payee: {
         partyIdType: 'MSISDN',
-        partyId: params.phone
+        partyId: params.phone.replace('+', '')
       },
       payerMessage: params.payerMessage,
       payeeNote: params.payeeNote

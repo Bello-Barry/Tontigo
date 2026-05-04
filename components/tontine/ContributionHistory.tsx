@@ -2,6 +2,7 @@
 import type { Contribution } from '@/lib/types'
 import { formatFCFA, formatDate } from '@/lib/utils/format'
 import { CheckCircle2, AlertTriangle, Clock } from 'lucide-react'
+import { MomoStatusBadge } from '@/components/shared/MomoStatusBadge'
 
 interface ContributionHistoryProps {
   contributions: Contribution[]
@@ -39,10 +40,15 @@ export function ContributionHistory({ contributions }: ContributionHistoryProps)
                   <Clock className="w-5 h-5 text-blue-400 flex-shrink-0" />
                 )}
                 <div>
-                  <p className="text-white text-sm font-medium">
-                    Cotisation
-                    {c.penalty_amount ? ` + Amende` : ''}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-white text-sm font-medium">
+                      Cotisation
+                      {c.penalty_amount ? ` + Amende` : ''}
+                    </p>
+                    {c.payment_reference && !isPaid && (
+                      <MomoStatusBadge referenceId={c.payment_reference} type="collection" />
+                    )}
+                  </div>
                   <p className="text-slate-400 text-xs">
                     Échéance: {formatDate(c.due_date)}
                     {isPaid && c.paid_at && ` — Payé le ${formatDate(c.paid_at)}`}
