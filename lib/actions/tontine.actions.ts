@@ -7,6 +7,7 @@ import { calculatePayoutCommission } from '@/lib/utils/commission'
 import { recordRevenue } from './commission.actions'
 import { creditWalletFromPayout } from './wallet.actions'
 import { requestToPay, getCollectionStatus } from '@/lib/momo'
+import { humanizePaymentError } from "@/lib/utils/payment-errors"
 import type { ActionResult } from '@/lib/types'
 
 // CRÉER UN GROUPE
@@ -276,7 +277,7 @@ export async function payContribution(
     return { data: { reference: paymentRef }, success: true }
   } catch (err: any) {
     console.error('payContribution error:', err)
-    return { error: 'Erreur lors du paiement' }
+    return { error: humanizePaymentError(err.message || "") }
   }
 }
 

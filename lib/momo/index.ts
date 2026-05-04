@@ -78,17 +78,19 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
 function formatPhone(phone: string): string {
   let cleaned = phone.replace(/\D/g, '') // Ne garder que les chiffres
 
-  // Si le numéro commence par +, on l'enlève (déjà fait par le regex ci-dessus)
-  // Si le numéro commence par 06 ou 05 sans l'indicatif 242
+  // Cas Congo-Brazzaville : 06 ou 05 suivi de 7 chiffres (9 chiffres)
   if (cleaned.length === 9 && (cleaned.startsWith('06') || cleaned.startsWith('05'))) {
     cleaned = '242' + cleaned.substring(1)
   }
-  // Si le numéro fait 12 chiffres et commence par 242
-  if (cleaned.length === 12 && cleaned.startsWith('242')) {
-    return cleaned
+  // Cas sans le 0 leading : 6 ou 5 suivi de 7 chiffres (8 chiffres)
+  else if (cleaned.length === 8 && (cleaned.startsWith('6') || cleaned.startsWith('5'))) {
+    cleaned = '242' + cleaned
+  }
+  // Cas international avec le 0 leading conservé : 24206... (12 chiffres)
+  else if (cleaned.length === 12 && cleaned.startsWith('2420')) {
+    cleaned = '242' + cleaned.substring(4)
   }
 
-  // Par défaut, retourner tel quel si déjà formaté ou si format inconnu (pour sandbox)
   return cleaned
 }
 
@@ -133,13 +135,21 @@ export async function requestToPay(params: {
   })
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}))
+    let errorBody = {}
+    try {
+      errorBody = await response.json()
+    } catch (e) {
+      errorBody = { message: await response.text() }
+    }
+
     console.error('MTN requestToPay error:', {
       status: response.status,
       body: errorBody,
       payload
     })
-    throw new Error(`Erreur MTN ${response.status}: ${JSON.stringify(errorBody)}`)
+
+    const message = (errorBody as any).message || (errorBody as any).code || 'Unknown error'
+    throw new Error(`MTN_ERROR_${response.status}: ${message}`)
   }
 
   return referenceId
@@ -186,13 +196,21 @@ export async function transfer(params: {
   })
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}))
+    let errorBody = {}
+    try {
+      errorBody = await response.json()
+    } catch (e) {
+      errorBody = { message: await response.text() }
+    }
+
     console.error('MTN transfer error:', {
       status: response.status,
       body: errorBody,
       payload
     })
-    throw new Error(`Erreur MTN ${response.status}: ${JSON.stringify(errorBody)}`)
+
+    const message = (errorBody as any).message || (errorBody as any).code || 'Unknown error'
+    throw new Error(`MTN_ERROR_${response.status}: ${message}`)
   }
 
   return referenceId

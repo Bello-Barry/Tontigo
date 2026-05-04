@@ -7,6 +7,7 @@ import type { ActionResult } from '@/lib/types'
 
 // ── Créditer le portefeuille après réception d'une cagnotte ──
 export async function creditWalletFromPayout(params: {
+import { humanizePaymentError } from "@/lib/utils/payment-errors"
   userId:      string
   payoutId:    string
   amount:      number
@@ -189,7 +190,7 @@ export async function withdrawFromWallet(params: {
         return { data: { reference: referenceId, netAmount }, success: true }
       } catch (err: any) {
         console.error('MTN Transfer error:', err)
-        return { error: 'Échec de la transaction MTN. Réessaye plus tard.' }
+        return { error: humanizePaymentError(err.message || "") }
       }
     }
 

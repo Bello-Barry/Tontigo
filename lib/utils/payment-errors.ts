@@ -8,6 +8,9 @@ export const PAYMENT_ERRORS: Record<string, string> = {
   'EXPIRED': 'La demande de paiement a expiré.',
   'INTERNAL_PROCESSING_ERROR': 'Erreur technique MTN. Réessaye dans un instant.',
   'SERVICE_UNAVAILABLE': 'Le service MTN MoMo est temporairement indisponible.',
+  'RESOURCE_NOT_FOUND': 'Ressource MTN introuvable.',
+  'INVALID_CALLBACK_URL_HOST': 'URL de rappel invalide.',
+  'BAD_REQUEST': 'Requête mal formée. Vérifiez le numéro ou le montant.',
 
   // Airtel Money errors
   'TIP-0001': 'Erreur technique Airtel. Réessaye plus tard.',
@@ -22,6 +25,21 @@ export const PAYMENT_ERRORS: Record<string, string> = {
   'GENERIC_ERROR': 'Une erreur est survenue lors du paiement.',
 }
 
-export function humanizePaymentError(code: string): string {
-  return PAYMENT_ERRORS[code] || PAYMENT_ERRORS['GENERIC_ERROR']
+export function humanizePaymentError(errorString: string): string {
+  // If the error contains a known code, return the human message
+  for (const code in PAYMENT_ERRORS) {
+    if (errorString.toUpperCase().includes(code)) {
+      return PAYMENT_ERRORS[code]
+    }
+  }
+
+  // Handle specific HTTP error messages from lib/momo/index.ts
+  if (errorString.includes('MTN_ERROR_400')) return PAYMENT_ERRORS['BAD_REQUEST']
+  if (errorString.includes('MTN_ERROR_401')) return 'Erreur d\'authentification MTN. Contactez le support.'
+  if (errorString.includes('MTN_ERROR_404')) return PAYMENT_ERRORS['RESOURCE_NOT_FOUND']
+  if (errorString.includes('MTN_ERROR_500') || errorString.includes('MTN_ERROR_503')) {
+    return PAYMENT_ERRORS['SERVICE_UNAVAILABLE']
+  }
+
+  return PAYMENT_ERRORS['GENERIC_ERROR']
 }

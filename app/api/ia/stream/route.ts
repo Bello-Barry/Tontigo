@@ -79,6 +79,7 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
+      console.warn("IA Stream: Tentative d'accès non authentifié.")
       return new Response('Non authentifié', { status: 401 })
     }
 
@@ -89,9 +90,11 @@ export async function POST(req: Request) {
     }
 
     if (!apiKey) {
-      console.error("Erreur IA: Clé API manquante.")
+      console.error("Erreur IA: Clé API manquante dans les variables d'environnement.")
       return new Response('Le service IA n\'est pas configuré.', { status: 503 })
     }
+
+    console.log(`IA Stream: Nouvelle requête de l'utilisateur ${user.id}. Message: ${message.substring(0, 50)}...`)
 
     // ─── Récupération du profil utilisateur (resilient) ───────────────────
     const userId = user.id
@@ -158,6 +161,7 @@ Utilise ces informations pour personnaliser tes conseils. Mentionne son prénom 
       maxOutputTokens: 1500,
       onFinish: async (event) => {
         const fullReply = event.text
+        console.log(`IA Stream: Réponse terminée pour l'utilisateur ${user.id}. Taille: ${fullReply.length} caractères.`)
         let targetId = conversationId
 
         if (!targetId) {
@@ -194,6 +198,6 @@ Utilise ces informations pour personnaliser tes conseils. Mentionne son prénom 
     })
   } catch (error) {
     console.error("Erreur API IA Stream:", error)
-    return new Response('Une erreur est survenue', { status: 500 })
+    return new Response('Une erreur est survenue lors du streaming IA.', { status: 500 })
   }
 }
