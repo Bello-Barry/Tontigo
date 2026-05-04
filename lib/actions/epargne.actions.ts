@@ -7,6 +7,7 @@ import { calculateSavingsCommission } from '@/lib/utils/commission'
 import { creditWalletFromVault } from './wallet.actions'
 import { requestToPay, getCollectionStatus } from '@/lib/momo'
 import type { ActionResult, SavingsVault } from '@/lib/types'
+import { humanizePaymentError } from "@/lib/utils/payment-errors"
 import type { CreateVaultInput, DepositVaultInput } from '@/lib/validations/epargne.schema'
 
 export async function createVault(input: CreateVaultInput): Promise<ActionResult<SavingsVault>> {
@@ -84,7 +85,7 @@ export async function depositToVault(
       return { data: { reference: referenceId }, success: true }
     } catch (err: any) {
       console.error('MoMo requestToPay error:', err)
-      return { error: 'Erreur lors de l\'initiation du paiement MoMo' }
+      return { error: humanizePaymentError(err.message || "") }
     }
   }
 

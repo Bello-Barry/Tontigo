@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { usePathname } from 'next/navigation'
 
 import {
@@ -385,7 +386,7 @@ export function AICoach() {
                               prose-blockquote:border-l-emerald-500 prose-blockquote:text-slate-400
                               prose-hr:border-slate-700
                             ">
-                              <ReactMarkdown>{content}</ReactMarkdown>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                               {isLoading && isLast && (
                                 <span className="inline-block w-1 h-4 bg-emerald-500 ml-1 animate-pulse align-middle" />
                               )}
@@ -438,7 +439,7 @@ export function AICoach() {
                 })}
 
                 {/* Spinner de chargement initial */}
-                {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+                {isLoading && !messages[messages.length - 1]?.content && (
                   <div className="flex gap-3">
                     <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm">
                       <Bot size={14} />

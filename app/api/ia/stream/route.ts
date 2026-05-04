@@ -1,20 +1,16 @@
 import { streamText } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { serviceClient } from '@/lib/supabase/service'
 
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
 
-if (!apiKey) {
-  console.warn("DEBUG IA: GOOGLE_GENERATIVE_AI_API_KEY est manquante dans les variables d'environnement.")
-}
-
 const google = createGoogleGenerativeAI({
   apiKey: apiKey || '',
 })
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { serviceClient } from '@/lib/supabase/service'
 
 // ─── Base de connaissances Likelemba (RAG simplifié) ────────────────────────
 const LIKELEMBA_KNOWLEDGE = `
@@ -83,6 +79,7 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
+      console.warn("IA Stream: Tentative d'accès non authentifié.")
       return new Response('Non authentifié', { status: 401 })
     }
 
@@ -93,14 +90,14 @@ export async function POST(req: Request) {
     }
 
     if (!apiKey) {
-      console.error("Erreur IA: Clé API manquante. Vérifiez vos variables d'environnement Vercel.")
-      return new Response('Le service IA n\'est pas configuré. Veuillez contacter l\'administrateur.', { status: 503 })
+      console.error("Erreur IA: Clé API manquante dans les variables d'environnement.")
+      return new Response('Le service IA n\'est pas configuré.', { status: 503 })
     }
 
-    // Use actual user.id
-    const userId = user.id
+    console.log(`IA Stream: Nouvelle requête de l'utilisateur ${user.id}. Message: ${message.substring(0, 50)}...`)
 
     // ─── Récupération du profil utilisateur (resilient) ───────────────────
+    const userId = user.id
     const [profileResult, membershipsResult, walletResult] = await Promise.allSettled([
       serviceClient
         .from('users')
@@ -155,18 +152,16 @@ Utilise ces informations pour personnaliser tes conseils. Mentionne son prénom 
       { role: 'user', content: message.trim() },
     ]
 
-    console.log("Appel streamText avec message:", message)
-    
-    // ─── Appel au modèle ───────────────────────────────────────────────────
-    const result = streamText({
-      model: google('gemini-2.0-flash'),
+    // ─── Appel au modèle (Raw Text Stream) ──────────────────────────────────
+    const { textStream } = await streamText({
+      model: google('gemini-1.5-flash'),
       system: systemPrompt,
       messages: coreMessages,
       temperature: 0.7,
       maxOutputTokens: 1500,
       onFinish: async (event) => {
         const fullReply = event.text
-        console.log("Réponse IA terminée:", fullReply.slice(0, 50) + "...")
+        console.log(`IA Stream: Réponse terminée pour l'utilisateur ${user.id}. Taille: ${fullReply.length} caractères.`)
         let targetId = conversationId
 
         if (!targetId) {
@@ -193,9 +188,16 @@ Utilise ces informations pour personnaliser tes conseils. Mentionne son prénom 
       }
     })
 
-    return result.toTextStreamResponse()
+    // On retourne le stream de texte pur pour être compatible avec le lecteur manuel du frontend
+    return new Response(textStream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    })
   } catch (error) {
     console.error("Erreur API IA Stream:", error)
-    return new Response('Une erreur est survenue', { status: 500 })
+    return new Response('Une erreur est survenue lors du streaming IA.', { status: 500 })
   }
 }
