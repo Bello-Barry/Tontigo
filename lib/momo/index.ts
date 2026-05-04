@@ -2,6 +2,7 @@ import crypto from 'crypto'
 
 const BASE_URL = process.env.MTN_MOMO_BASE_URL || 'https://sandbox.momodeveloper.mtn.com'
 const ENV = process.env.MTN_MOMO_ENV || 'sandbox'
+const CURRENCY = process.env.MTN_MOMO_CURRENCY || (ENV === 'sandbox' ? 'EUR' : 'XAF')
 
 // Collection Config
 const COLL_SUB_KEY = process.env.MOMO_COLLECTION_SUBSCRIPTION_KEY
@@ -13,10 +14,10 @@ const DISB_SUB_KEY = process.env.MOMO_DISBURSEMENT_SUBSCRIPTION_KEY
 const DISB_USER_ID = process.env.MOMO_DISBURSEMENT_API_USER_ID
 const DISB_API_KEY = process.env.MOMO_DISBURSEMENT_API_KEY
  
-// Cache pour les tokens (mémoire vive - dure le temps de l'instance du serveur)
+// Cache pour les tokens (mémoire vive)
 const tokenCache: Record<string, { token: string; expiresAt: number }> = {}
 
-// Callback Config — Prioritize manual override, then Vercel's internal URL, then APP_URL
+// Callback Config
 const getCallbackHost = () => {
   if (process.env.MOMO_CALLBACK_HOST) return process.env.MOMO_CALLBACK_HOST
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
@@ -25,19 +26,13 @@ const getCallbackHost = () => {
 
 const CALLBACK_HOST = getCallbackHost()
 
-if (CALLBACK_HOST) {
-  console.log("MTN MoMo: Callback Host configuré sur", CALLBACK_HOST)
-} else {
-  console.warn("MTN MoMo: Aucun CALLBACK_HOST détecté. Les paiements ne seront pas mis à jour automatiquement via webhook.")
-}
-
 /**
  * Génère un token d'accès pour un produit spécifique (collection ou disbursement)
  */
 async function getToken(product: 'collection' | 'disbursement'): Promise<string> {
-  // Vérifier le cache
   const cached = tokenCache[product]
-  if (cached && cached.expiresAt > Date.now() + 60000) { // On prend une marge de 1min
+  // Expire le token 30 secondes avant pour éviter les race conditions
+  if (cached && cached.expiresAt > Date.now() + 30000) {
     return cached.token
   }
 
@@ -46,9 +41,7 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
   const subKey = product === 'collection' ? COLL_SUB_KEY : DISB_SUB_KEY
 
   if (!userId || !apiKey || !subKey) {
-    const errorMsg = `Configuration manquante pour ${product}. Vérifiez les variables d'environnement Vercel (Subscription Key, User ID, API Key).`
-    console.error(errorMsg)
-    throw new Error(errorMsg)
+    throw new Error(`Configuration manquante pour ${product}.`)
   }
 
   const auth = Buffer.from(`${userId}:${apiKey}`).toString('base64')
@@ -65,13 +58,12 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
 
   if (!response.ok) {
     const errorText = await response.text()
-    console.error(`Error fetching token for ${product}:`, response.status, errorText)
-    throw new Error(`Failed to get ${product} token: ${response.status}`)
+    console.error(`MTN Token Error (${product}):`, response.status, errorText)
+    throw new Error(`Erreur token MTN ${product}: ${response.status}`)
   }
 
   const data = await response.json()
 
-  // Mettre en cache (expires_in est souvent 3600s)
   tokenCache[product] = {
     token: data.access_token,
     expiresAt: Date.now() + (data.expires_in * 1000)
@@ -81,8 +73,27 @@ async function getToken(product: 'collection' | 'disbursement'): Promise<string>
 }
 
 /**
+ * Nettoie et formate le numéro de téléphone pour MTN (format 2426XXXXXXXX)
+ */
+function formatPhone(phone: string): string {
+  let cleaned = phone.replace(/\D/g, '') // Ne garder que les chiffres
+
+  // Si le numéro commence par +, on l'enlève (déjà fait par le regex ci-dessus)
+  // Si le numéro commence par 06 ou 05 sans l'indicatif 242
+  if (cleaned.length === 9 && (cleaned.startsWith('06') || cleaned.startsWith('05'))) {
+    cleaned = '242' + cleaned.substring(1)
+  }
+  // Si le numéro fait 12 chiffres et commence par 242
+  if (cleaned.length === 12 && cleaned.startsWith('242')) {
+    return cleaned
+  }
+
+  // Par défaut, retourner tel quel si déjà formaté ou si format inconnu (pour sandbox)
+  return cleaned
+}
+
+/**
  * Initie une demande de paiement (Encaissement)
- * @returns Le Reference-Id de la transaction
  */
 export async function requestToPay(params: {
   amount: number
@@ -95,8 +106,18 @@ export async function requestToPay(params: {
   const referenceId = crypto.randomUUID()
   const callbackUrl = CALLBACK_HOST ? `${CALLBACK_HOST}/api/momo/callback/collection` : undefined
 
-  console.log(`MTN MoMo: Initiation requestToPay ${referenceId} pour ${params.phone} (${params.amount} FCFA). Callback: ${callbackUrl || 'AUCUN'}`)
-  
+  const payload = {
+    amount: params.amount.toString(),
+    currency: CURRENCY,
+    externalId: referenceId,
+    payer: {
+      partyIdType: 'MSISDN',
+      partyId: formatPhone(params.phone)
+    },
+    payerMessage: params.payerMessage.substring(0, 160),
+    payeeNote: params.payeeNote.substring(0, 160)
+  }
+
   const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay`, {
     method: 'POST',
     headers: {
@@ -107,56 +128,25 @@ export async function requestToPay(params: {
       'Content-Type': 'application/json',
       ...(callbackUrl ? { 'X-Callback-Url': callbackUrl } : {})
     } as Record<string, string>,
-    body: JSON.stringify({
-      amount: params.amount.toString(),
-      currency: 'EUR', // Sandbox only supports EUR
-      externalId: referenceId, // On passe le referenceId en externalId pour simplifier le callback
-      payer: {
-        partyIdType: 'MSISDN',
-        partyId: params.phone.replace('+', '') // Nettoyage du numéro
-      },
-      payerMessage: params.payerMessage,
-      payeeNote: params.payeeNote
-    }),
+    body: JSON.stringify(payload),
     cache: 'no-store'
   })
 
-  if (response.status !== 202) {
-    const errorText = await response.text()
-    console.error('requestToPay error:', response.status, errorText)
-    throw new Error(`requestToPay failed with status ${response.status}`)
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}))
+    console.error('MTN requestToPay error:', {
+      status: response.status,
+      body: errorBody,
+      payload
+    })
+    throw new Error(`Erreur MTN ${response.status}: ${JSON.stringify(errorBody)}`)
   }
 
   return referenceId
 }
 
 /**
- * Vérifie le statut d'une demande de paiement
- * Statuts possibles: PENDING, SUCCESSFUL, FAILED
- */
-export async function getCollectionStatus(referenceId: string): Promise<any> {
-  const token = await getToken('collection')
-
-  const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay/${referenceId}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'X-Target-Environment': ENV,
-      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY || ''
-    } as Record<string, string>,
-    cache: 'no-store'
-  })
-
-  if (!response.ok) {
-    throw new Error(`getCollectionStatus failed with status ${response.status}`)
-  }
-
-  return response.json()
-}
-
-/**
- * Initie un transfert (Décaissement vers l'utilisateur)
- * @returns Le Reference-Id de la transaction
+ * Initie un transfert (Décaissement)
  */
 export async function transfer(params: {
   amount: number
@@ -169,7 +159,17 @@ export async function transfer(params: {
   const referenceId = crypto.randomUUID()
   const callbackUrl = CALLBACK_HOST ? `${CALLBACK_HOST}/api/momo/callback/disbursement` : undefined
 
-  console.log(`MTN MoMo: Initiation transfer ${referenceId} pour ${params.phone} (${params.amount} FCFA). Callback: ${callbackUrl || 'AUCUN'}`)
+  const payload = {
+    amount: params.amount.toString(),
+    currency: CURRENCY,
+    externalId: referenceId,
+    payee: {
+      partyIdType: 'MSISDN',
+      partyId: formatPhone(params.phone)
+    },
+    payerMessage: params.payerMessage.substring(0, 160),
+    payeeNote: params.payeeNote.substring(0, 160)
+  }
 
   const response = await fetch(`${BASE_URL}/disbursement/v1_0/transfer`, {
     method: 'POST',
@@ -181,36 +181,40 @@ export async function transfer(params: {
       'Content-Type': 'application/json',
       ...(callbackUrl ? { 'X-Callback-Url': callbackUrl } : {})
     } as Record<string, string>,
-    body: JSON.stringify({
-      amount: params.amount.toString(),
-      currency: 'EUR', // Sandbox only supports EUR
-      externalId: referenceId,
-      payee: {
-        partyIdType: 'MSISDN',
-        partyId: params.phone.replace('+', '')
-      },
-      payerMessage: params.payerMessage,
-      payeeNote: params.payeeNote
-    }),
+    body: JSON.stringify(payload),
     cache: 'no-store'
   })
 
-  if (response.status !== 202) {
-    const errorText = await response.text()
-    console.error('transfer error:', response.status, errorText)
-    throw new Error(`transfer failed with status ${response.status}`)
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}))
+    console.error('MTN transfer error:', {
+      status: response.status,
+      body: errorBody,
+      payload
+    })
+    throw new Error(`Erreur MTN ${response.status}: ${JSON.stringify(errorBody)}`)
   }
 
   return referenceId
 }
 
-/**
- * Vérifie le statut d'un transfert
- * Statuts possibles: PENDING, SUCCESSFUL, FAILED
- */
+export async function getCollectionStatus(referenceId: string): Promise<any> {
+  const token = await getToken('collection')
+  const response = await fetch(`${BASE_URL}/collection/v1_0/requesttopay/${referenceId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'X-Target-Environment': ENV,
+      'Ocp-Apim-Subscription-Key': COLL_SUB_KEY || ''
+    } as Record<string, string>,
+    cache: 'no-store'
+  })
+  if (!response.ok) throw new Error(`Status error: ${response.status}`)
+  return response.json()
+}
+
 export async function getDisbursementStatus(referenceId: string): Promise<any> {
   const token = await getToken('disbursement')
-
   const response = await fetch(`${BASE_URL}/disbursement/v1_0/transfer/${referenceId}`, {
     method: 'GET',
     headers: {
@@ -220,10 +224,6 @@ export async function getDisbursementStatus(referenceId: string): Promise<any> {
     } as Record<string, string>,
     cache: 'no-store'
   })
-
-  if (!response.ok) {
-    throw new Error(`getDisbursementStatus failed with status ${response.status}`)
-  }
-
+  if (!response.ok) throw new Error(`Status error: ${response.status}`)
   return response.json()
 }
