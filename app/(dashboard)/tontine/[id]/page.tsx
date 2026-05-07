@@ -14,6 +14,8 @@ import { StartGroupButton } from '@/components/tontine/StartGroupButton'
 import { CopyInviteCode } from '@/components/tontine/CopyInviteCode'
 import { formatFCFA, getFrequencyLabel } from '@/lib/utils/format'
 import { GroupChat } from '@/components/tontine/GroupChat'
+import { GroupSummaryWidgetClient } from '@/components/tontine/GroupSummaryWidgetClient'
+import { PaymentRiskAlertClient } from '@/components/tontine/PaymentRiskAlertClient'
 
 interface Props {
   params: { id: string }
@@ -251,6 +253,14 @@ export default async function GroupDetailPage(props: Props) {
             ))}
           </div>
         </section>
+      )}
+
+      {/* Résumé IA du groupe (tous les membres) */}
+      <GroupSummaryWidgetClient groupId={group.id} />
+
+      {/* Alertes de risque de paiement (créateur uniquement) */}
+      {isCreator && group.status === 'actif' && (
+        <PaymentRiskAlertClient groupId={group.id} />
       )}
 
       {/* Floating Chat */}

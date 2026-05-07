@@ -14,13 +14,18 @@ const DISB_USER_ID = process.env.MOMO_DISBURSEMENT_API_USER_ID
 const DISB_API_KEY = process.env.MOMO_DISBURSEMENT_API_KEY
  
 // Callback Config — Prioritize manual override, then Vercel's internal URL, then APP_URL
-const getCallbackHost = () => {
-  // In Sandbox, if the API User was created with a dummy providerCallbackHost (e.g. 'string'), 
-  // sending a real URL will cause INVALID_CALLBACK_URL_HOST. We disable it in dev mode.
-  if (process.env.NODE_ENV === 'development') return null;
-  if (process.env.MOMO_CALLBACK_HOST) return process.env.MOMO_CALLBACK_HOST;
+const getCallbackHost = (): string | null => {
+  // IMPORTANT: En mode Sandbox MTN, l'API User a été créé avec providerCallbackHost='string'.
+  // Envoyer une vraie URL callback provoque INVALID_CALLBACK_URL_HOST.
+  // On désactive le callback en mode sandbox, que ce soit en dev local OU sur Vercel.
+  if (ENV === 'sandbox') return null;
+  
+  // En production (live), on utilise la vraie URL
+  if (process.env.MOMO_CALLBACK_HOST && process.env.MOMO_CALLBACK_HOST !== 'http://localhost:3000') {
+    return process.env.MOMO_CALLBACK_HOST;
+  }
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return process.env.NEXT_PUBLIC_APP_URL;
+  return process.env.NEXT_PUBLIC_APP_URL || null;
 }
 
 // removed static CALLBACK_HOST
@@ -134,9 +139,10 @@ export async function getCollectionStatus(referenceId: string): Promise<any> {
 
   const data = await response.json()
   
-  // In Sandbox, transactions often stay PENDING indefinitely. 
-  // We mock a SUCCESSFUL response in development to allow local UI testing.
-  if (process.env.NODE_ENV === 'development' && data.status === 'PENDING') {
+  // En Sandbox MTN, les transactions restent PENDING indéfiniment.
+  // On simule un SUCCESSFUL pour permettre le test du flux complet,
+  // que ce soit en local (development) OU sur Vercel (production avec sandbox).
+  if (ENV === 'sandbox' && data.status === 'PENDING') {
     data.status = 'SUCCESSFUL'
   }
 

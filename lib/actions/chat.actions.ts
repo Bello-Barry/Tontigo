@@ -80,6 +80,12 @@ export async function sendAudioMessage(
       .single()
 
     if (error) return { error: error.message }
+
+    // Lancer la transcription en arrière-plan (non bloquant)
+    import('@/lib/ai/modules/voice-transcription').then(({ transcribeAudioMessage }) => {
+      transcribeAudioMessage({ messageId: data.id, audioUrl }).catch(console.error)
+    })
+
     return { data: { id: data.id }, success: true }
 
   } catch (err: any) {

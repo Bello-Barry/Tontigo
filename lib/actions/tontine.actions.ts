@@ -527,3 +527,74 @@ function getNextDueDate(frequency: string): string {
   else                               date.setMonth(date.getMonth() + 1)
   return date.toISOString().split('T')[0]
 }
+
+// ── Résumé IA du groupe ────────────────────────────────────────
+export async function getGroupAISummary(groupId: string): Promise<ActionResult<any>> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
+
+  // Vérifier que l'utilisateur est membre
+  const { data: membership } = await serviceClient
+    .from('memberships')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!membership) return { error: 'Accès refusé' }
+
+  try {
+    const { generateGroupSummary } = await import('@/lib/ai/modules/group-summary')
+    const result = await generateGroupSummary({ groupId })
+    if (!result) return { error: 'Pas assez de messages pour générer un résumé' }
+    return { data: result, success: true }
+  } catch (err: any) {
+    console.error('getGroupAISummary error:', err)
+    return { error: 'Erreur lors de la génération du résumé' }
+  }
+}
+
+// ── Analyse de risque de paiement (créateur uniquement) ───────
+export async function getGroupPaymentRisks(groupId: string): Promise<ActionResult<any[]>> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
+
+  // Vérifier que l'utilisateur est créateur
+  const { data: group } = await serviceClient
+    .from('tontine_groups')
+    .select('creator_id')
+    .eq('id', groupId)
+    .single()
+
+  if (!group || group.creator_id !== user.id) return { error: 'Réservé au créateur' }
+
+  try {
+    const { data: memberships } = await serviceClient
+      .from('memberships')
+      .select('id, users:user_id (full_name)')
+      .eq('group_id', groupId)
+      .eq('status', 'actif')
+
+    if (!memberships || memberships.length === 0) return { data: [], success: true }
+
+    const { analyzePaymentRisk } = await import('@/lib/ai/modules/payment-risk')
+    const results = await Promise.all(
+      memberships.map(async m => {
+        const risk = await analyzePaymentRisk({ membershipId: m.id, groupId })
+        const user = m.users as any
+        return {
+          userId:   user?.id ?? m.id,
+          userName: user?.full_name ?? 'Membre',
+          ...risk,
+        }
+      })
+    )
+
+    return { data: results, success: true }
+  } catch (err: any) {
+    console.error('getGroupPaymentRisks error:', err)
+    return { error: 'Erreur lors de l\'analyse des risques' }
+  }
+}

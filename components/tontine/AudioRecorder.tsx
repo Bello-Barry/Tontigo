@@ -1,6 +1,6 @@
 'use client'
 import { useRef, useState, useEffect } from 'react'
-import { Mic, Send, X, Loader2, Play, Pause } from 'lucide-react'
+import { Mic, Send, X, Loader2, Play, Pause, Lock, LockOpen, Square } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { sendAudioMessage } from '@/lib/actions/chat.actions'
 import { toast } from 'react-toastify'
@@ -13,6 +13,7 @@ interface AudioRecorderProps {
 
 export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimistic }: AudioRecorderProps) {
   const [recording, setRecording]     = useState(false)
+  const [locked, setLocked]            = useState(false)  // mode mains libres
   const [audioBlob, setAudioBlob]     = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl]       = useState<string | null>(null)
   const [duration, setDuration]       = useState(0)
@@ -108,6 +109,7 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
 
       recorder.start(100)
       setRecording(true)
+      setLocked(false)
       setDuration(0)
       drawVisualizer(stream)
 
@@ -133,14 +135,16 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
     }
     if (timerRef.current) clearInterval(timerRef.current)
     setRecording(false)
+    setLocked(false)
   }
 
   const handleMicClick = async () => {
-    if (recording) {
+    if (recording && !locked) {
       stopRecording()
-    } else {
+    } else if (!recording) {
       await startRecording()
     }
+    // Si locked, le clic sur le mic ne fait rien (il faut appuyer sur stop)
   }
 
   const cancelAudio = () => {
@@ -277,27 +281,63 @@ export function AudioRecorder({ groupId, onOptimisticMessage, onReplaceOptimisti
           className="rounded-lg bg-emerald-500/5 border border-emerald-500/10"
         />
       )}
+
+      {/* Bouton Stop (mode mains-libres) */}
+      {recording && locked && (
+        <button
+          onClick={stopRecording}
+          className="w-10 h-10 rounded-xl bg-red-500 text-white flex items-center justify-center hover:bg-red-400 transition-colors shadow-lg shadow-red-900/30 animate-in zoom-in-95 duration-200"
+          title="Arrêter l'enregistrement"
+        >
+          <Square className="w-4 h-4 fill-white" />
+        </button>
+      )}
+
+      {/* Bouton verrou mains-libres (pendant enregistrement) */}
+      {recording && !locked && (
+        <button
+          onClick={() => setLocked(true)}
+          className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 hover:text-amber-400 hover:border-amber-500/30 flex items-center justify-center transition-all"
+          title="Verrouiller l'enregistrement (mains libres)"
+        >
+          <LockOpen className="w-4 h-4" />
+        </button>
+      )}
+
       <button
         onClick={handleMicClick}
         className={`
           relative w-12 h-12 rounded-2xl transition-all duration-500 flex items-center justify-center
-          ${recording
+          ${recording && locked
+            ? 'bg-amber-500 shadow-lg shadow-amber-900/40 scale-110 cursor-default'
+            : recording
             ? 'bg-red-500 shadow-lg shadow-red-900/40 scale-110'
             : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-emerald-400 hover:border-emerald-500/30'
           }
         `}
+        title={recording && locked ? 'Enregistrement verrouillé (mains libres actif)' : undefined}
       >
         {recording ? (
-          <div className="flex flex-col items-center">
+          locked ? (
+            <div className="flex flex-col items-center">
+              <Lock className="w-4 h-4 text-white mb-0.5" />
+              <span className="text-white text-[9px] font-black">{formatDuration(duration)}</span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse mb-0.5" />
               <span className="text-white text-[10px] font-black">{formatDuration(duration)}</span>
-          </div>
+            </div>
+          )
         ) : (
           <Mic className="w-5 h-5" />
         )}
         
-        {recording && (
+        {recording && !locked && (
           <div className="absolute -inset-1 rounded-2xl border-2 border-red-500 animate-ping opacity-20 pointer-events-none" />
+        )}
+        {recording && locked && (
+          <div className="absolute -inset-1 rounded-2xl border-2 border-amber-500 animate-ping opacity-20 pointer-events-none" />
         )}
       </button>
     </div>

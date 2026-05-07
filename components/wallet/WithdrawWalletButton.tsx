@@ -5,7 +5,7 @@ import { toast } from 'react-toastify'
 import { withdrawFromWallet } from '@/lib/actions/wallet.actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Download, Loader2 } from 'lucide-react'
+import { Download, Loader2, Fingerprint, ShieldCheck } from 'lucide-react'
 import { formatFCFA } from '@/lib/utils/format'
 
 interface WithdrawWalletButtonProps {
@@ -19,17 +19,39 @@ interface WithdrawWalletButtonProps {
 export function WithdrawWalletButton({
   source, maxAmount, label, variant = 'default'
 }: WithdrawWalletButtonProps) {
-  const [open, setOpen]       = useState(false)
-  const [amount, setAmount]   = useState(String(maxAmount))
-  const [wallet, setWallet]   = useState<'mtn' | 'airtel'>('mtn')
-  const [phone, setPhone]     = useState('')
-  const [loading, setLoading] = useState(false)
+  const [open, setOpen]           = useState(false)
+  const [amount, setAmount]       = useState(String(maxAmount))
+  const [wallet, setWallet]       = useState<'mtn' | 'airtel'>('mtn')
+  const [phone, setPhone]         = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [bioChecked, setBioChecked] = useState(false)
+  const [bioLoading, setBioLoading] = useState(false)
   const router = useRouter()
+
+  const handleBiometric = async () => {
+    setBioLoading(true)
+    try {
+      const { requestBiometricConfirmation } = await import('@/lib/biometric')
+      const confirmed = await requestBiometricConfirmation(`Confirmer le retrait de ${formatFCFA(parseFloat(amount))}`)
+      if (confirmed) {
+        setBioChecked(true)
+        toast.success('✅ Identité confirmée', { autoClose: 2000 })
+      } else {
+        toast.error('Authentification biométrique refusée.')
+      }
+    } catch {
+      // Si WebAuthn non disponible, on laisse passer
+      setBioChecked(true)
+    } finally {
+      setBioLoading(false)
+    }
+  }
 
   const handleWithdraw = async () => {
     const num = parseFloat(amount)
     if (!num || num < 500)        { toast.error('Minimum 500 FCFA'); return }
     if (num > maxAmount)           { toast.error('Montant supérieur au solde'); return }
+    if (!bioChecked)               { toast.error('Veuillez d\'abord confirmer votre identité.'); return }
 
     setLoading(true)
     try {
@@ -51,21 +73,21 @@ export function WithdrawWalletButton({
         toast.info('💸 Traitement du retrait vers MTN Money...', {
           autoClose: false,
           toastId: 'withdraw-pending',
-          icon: <Loader2 className="animate-spin text-yellow-400" />
+          icon: <Loader2 className="animate-spin text-yellow-400" />,
         })
 
-        // Polling pour vérifier le statut du décaissement
         let attempts = 0
         const interval = setInterval(async () => {
           attempts++
           const { verifyWithdrawal } = await import('@/lib/actions/wallet.actions')
           const check = await verifyWithdrawal(refId)
-          
+
           if (check.data?.status === 'SUCCESSFUL') {
             clearInterval(interval)
             toast.dismiss('withdraw-pending')
             toast.success(`✅ ${formatFCFA(num)} envoyés sur ton MTN Money !`)
             setOpen(false)
+            setBioChecked(false)
             setLoading(false)
             router.refresh()
           } else if (check.data?.status === 'FAILED' || attempts > 20) {
@@ -76,9 +98,9 @@ export function WithdrawWalletButton({
           }
         }, 3000)
       } else {
-        // Simulation ou Airtel
         toast.success(`✅ ${formatFCFA(num)} envoyés sur ton portefeuille mobile !`)
         setOpen(false)
+        setBioChecked(false)
         setLoading(false)
         router.refresh()
       }
@@ -91,7 +113,7 @@ export function WithdrawWalletButton({
   if (!open) {
     return (
       <Button
-        onClick={() => setOpen(true)}
+        onClick={() => { setOpen(true); setBioChecked(false) }}
         className={`
           w-full h-14 gap-3 font-bold rounded-2xl transition-all duration-300
           ${variant === 'primary'
@@ -110,7 +132,7 @@ export function WithdrawWalletButton({
     <div className="glass-card p-6 space-y-6 border border-emerald-500/30 bg-emerald-500/5 animate-in zoom-in-95 duration-300">
       <div className="flex items-center justify-between">
         <p className="text-white font-bold text-lg">{label}</p>
-        <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-slate-500 hover:text-white">Annuler</Button>
+        <Button variant="ghost" size="sm" onClick={() => { setOpen(false); setBioChecked(false) }} className="text-slate-500 hover:text-white">Annuler</Button>
       </div>
 
       {/* Montant */}
@@ -120,7 +142,7 @@ export function WithdrawWalletButton({
           <Input
             type="number"
             value={amount}
-            onChange={e => setAmount(e.target.value)}
+            onChange={e => { setAmount(e.target.value); setBioChecked(false) }}
             max={maxAmount}
             min={500}
             className="bg-slate-900/50 border-slate-800 text-white h-14 text-xl font-bold pl-4 focus:ring-emerald-500/50 rounded-xl"
@@ -140,7 +162,7 @@ export function WithdrawWalletButton({
           {(['mtn', 'airtel'] as const).map(w => (
             <button
               key={w}
-              onClick={() => setWallet(w)}
+              onClick={() => { setWallet(w); setBioChecked(false) }}
               className={`
                 flex-1 py-4 rounded-2xl text-sm font-bold transition-all duration-300 border-2
                 ${wallet === w
@@ -168,11 +190,30 @@ export function WithdrawWalletButton({
         <p className="text-[10px] text-slate-500 italic">Par défaut, nous utilisons le numéro lié à ton profil.</p>
       </div>
 
-      {/* Actions */}
+      {/* Étape biométrique */}
+      {!bioChecked ? (
+        <button
+          onClick={handleBiometric}
+          disabled={bioLoading}
+          className="w-full h-14 rounded-2xl border-2 border-dashed border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 font-bold flex items-center justify-center gap-3 transition-all"
+        >
+          {bioLoading
+            ? <><Loader2 className="w-5 h-5 animate-spin" /> Vérification...</>
+            : <><Fingerprint className="w-5 h-5" /> Confirmer mon identité</>
+          }
+        </button>
+      ) : (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+          <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+          <p className="text-emerald-400 text-sm font-semibold">Identité confirmée — vous pouvez retirer</p>
+        </div>
+      )}
+
+      {/* Bouton confirmation finale */}
       <Button
         onClick={handleWithdraw}
-        disabled={loading}
-        className="w-full h-14 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-lg rounded-2xl shadow-lg shadow-emerald-900/40 transition-all active:scale-95"
+        disabled={loading || !bioChecked}
+        className="w-full h-14 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-bold text-lg rounded-2xl shadow-lg shadow-emerald-900/40 transition-all active:scale-95"
       >
         {loading
           ? <div className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Traitement...</div>
@@ -182,4 +223,3 @@ export function WithdrawWalletButton({
     </div>
   )
 }
-
