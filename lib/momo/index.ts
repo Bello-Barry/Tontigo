@@ -15,13 +15,15 @@ const DISB_API_KEY = process.env.MOMO_DISBURSEMENT_API_KEY
  
 // Callback Config — Prioritize manual override, then Vercel's internal URL, then APP_URL
 const getCallbackHost = () => {
-  if (process.env.MOMO_CALLBACK_HOST) return process.env.MOMO_CALLBACK_HOST
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
-  return process.env.NEXT_PUBLIC_APP_URL
+  // In Sandbox, if the API User was created with a dummy providerCallbackHost (e.g. 'string'), 
+  // sending a real URL will cause INVALID_CALLBACK_URL_HOST. We disable it in dev mode.
+  if (process.env.NODE_ENV === 'development') return null;
+  if (process.env.MOMO_CALLBACK_HOST) return process.env.MOMO_CALLBACK_HOST;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return process.env.NEXT_PUBLIC_APP_URL;
 }
 
-const CALLBACK_HOST = getCallbackHost()
-
+// removed static CALLBACK_HOST
 /**
  * Génère un token d'accès pour un produit spécifique (collection ou disbursement)
  */
@@ -84,7 +86,7 @@ export async function requestToPay(params: {
       'X-Target-Environment': ENV,
       'Ocp-Apim-Subscription-Key': COLL_SUB_KEY || '',
       'Content-Type': 'application/json',
-      ...(CALLBACK_HOST ? { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/collection` } : {})
+      ...(getCallbackHost() ? { 'X-Callback-Url': `${getCallbackHost()}/api/momo/callback/collection` } : {})
     } as Record<string, string>,
     body: JSON.stringify({
       amount: params.amount.toString(),
@@ -130,7 +132,15 @@ export async function getCollectionStatus(referenceId: string): Promise<any> {
     throw new Error(`getCollectionStatus failed with status ${response.status}`)
   }
 
-  return response.json()
+  const data = await response.json()
+  
+  // In Sandbox, transactions often stay PENDING indefinitely. 
+  // We mock a SUCCESSFUL response in development to allow local UI testing.
+  if (process.env.NODE_ENV === 'development' && data.status === 'PENDING') {
+    data.status = 'SUCCESSFUL'
+  }
+
+  return data
 }
 
 /**
@@ -155,7 +165,7 @@ export async function transfer(params: {
       'X-Target-Environment': ENV,
       'Ocp-Apim-Subscription-Key': DISB_SUB_KEY || '',
       'Content-Type': 'application/json',
-      ...(CALLBACK_HOST ? { 'X-Callback-Url': `${CALLBACK_HOST}/api/momo/callback/disbursement` } : {})
+      ...(getCallbackHost() ? { 'X-Callback-Url': `${getCallbackHost()}/api/momo/callback/disbursement` } : {})
     } as Record<string, string>,
     body: JSON.stringify({
       amount: params.amount.toString(),

@@ -4,7 +4,15 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PUBLIC_ROUTES = ['/', '/login', '/register', '/onboarding', '/features', '/how-it-works', '/about', '/mentions-legales', '/confidentialite']
 const AUTH_ROUTES   = ['/login', '/register']
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
 export async function middleware(request: NextRequest) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Middleware: Missing Supabase environment variables')
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(

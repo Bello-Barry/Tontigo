@@ -63,7 +63,7 @@ export async function joinGroupByCode(code: string): Promise<ActionResult<{ id: 
     const { data: group, error: gError } = await serviceClient
       .from('tontine_groups')
       .select('*')
-      .eq('invite_code', code.toUpperCase())
+      .ilike('invite_code', code)
       .single()
 
     if (gError || !group) return { error: 'Code d\'invitation invalide.' }

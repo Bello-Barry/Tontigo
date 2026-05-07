@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
@@ -48,20 +49,23 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <head>
-        <script dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              var theme = localStorage.getItem('theme') || 'dark';
-              document.documentElement.classList.add(theme);
-            })();
-          `
-        }} />
-      </head>
+      <head />
       <body 
         className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-300"
         suppressHydrationWarning
       >
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var theme = localStorage.getItem('theme') || 'dark';
+                document.documentElement.classList.add(theme);
+              })();
+            `
+          }}
+        />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

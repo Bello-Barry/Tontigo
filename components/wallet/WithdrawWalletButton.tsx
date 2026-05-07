@@ -50,7 +50,8 @@ export function WithdrawWalletButton({
         const refId = result.data.reference
         toast.info('💸 Traitement du retrait vers MTN Money...', {
           autoClose: false,
-          toastId: 'withdraw-pending'
+          toastId: 'withdraw-pending',
+          icon: <Loader2 className="animate-spin text-yellow-400" />
         })
 
         // Polling pour vérifier le statut du décaissement
@@ -92,91 +93,93 @@ export function WithdrawWalletButton({
       <Button
         onClick={() => setOpen(true)}
         className={`
-          w-full h-12 gap-2 font-semibold
+          w-full h-14 gap-3 font-bold rounded-2xl transition-all duration-300
           ${variant === 'primary'
-            ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
-            : 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600'
+            ? 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-lg shadow-emerald-900/40 border-none'
+            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow-sm'
           }
         `}
       >
-        <Download className="w-4 h-4" />
+        <Download className="w-5 h-5" />
         {label}
       </Button>
     )
   }
 
   return (
-    <div className="glass-card p-4 space-y-4 border border-emerald-500/20">
-      <p className="text-white font-medium text-sm">{label}</p>
+    <div className="glass-card p-6 space-y-6 border border-emerald-500/30 bg-emerald-500/5 animate-in zoom-in-95 duration-300">
+      <div className="flex items-center justify-between">
+        <p className="text-white font-bold text-lg">{label}</p>
+        <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-slate-500 hover:text-white">Annuler</Button>
+      </div>
 
       {/* Montant */}
-      <div className="space-y-1">
-        <Input
-          type="number"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          max={maxAmount}
-          min={500}
-          className="bg-slate-800 border-slate-700 text-white h-11"
-          placeholder="Montant en FCFA"
-        />
+      <div className="space-y-2">
+        <label className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Montant à retirer</label>
+        <div className="relative">
+          <Input
+            type="number"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            max={maxAmount}
+            min={500}
+            className="bg-slate-900/50 border-slate-800 text-white h-14 text-xl font-bold pl-4 focus:ring-emerald-500/50 rounded-xl"
+            placeholder="0"
+          />
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">FCFA</div>
+        </div>
         <p className="text-slate-500 text-xs">
-          Disponible : {formatFCFA(maxAmount)}
+          Maximum retirable : <span className="text-emerald-400 font-medium">{formatFCFA(maxAmount)}</span>
         </p>
       </div>
 
       {/* Choix wallet */}
-      <div className="flex gap-2">
-        {(['mtn', 'airtel'] as const).map(w => (
-          <button
-            key={w}
-            onClick={() => setWallet(w)}
-            className={`
-              flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors
-              ${wallet === w
-                ? w === 'mtn'
-                  ? 'bg-yellow-400 text-black'
-                  : 'bg-red-500 text-white'
-                : 'bg-slate-700 text-slate-400'
-              }
-            `}
-          >
-            {w === 'mtn' ? '🟡 MTN Money' : '🔴 Airtel Money'}
-          </button>
-        ))}
+      <div className="space-y-2">
+        <label className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Méthode de réception</label>
+        <div className="flex gap-3">
+          {(['mtn', 'airtel'] as const).map(w => (
+            <button
+              key={w}
+              onClick={() => setWallet(w)}
+              className={`
+                flex-1 py-4 rounded-2xl text-sm font-bold transition-all duration-300 border-2
+                ${wallet === w
+                  ? w === 'mtn'
+                    ? 'bg-yellow-400 border-yellow-400 text-black shadow-lg shadow-yellow-900/20 scale-[1.02]'
+                    : 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-900/20 scale-[1.02]'
+                  : 'bg-slate-900 border-slate-800 text-slate-500 grayscale opacity-60 hover:grayscale-0 hover:opacity-100'
+                }
+              `}
+            >
+              {w === 'mtn' ? '🟡 MTN Money' : '🔴 Airtel Money'}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="space-y-1">
-        <label className="text-xs text-slate-400">Numéro {wallet === 'mtn' ? 'MTN' : 'Airtel'} Money</label>
+      <div className="space-y-2">
+        <label className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Numéro de téléphone</label>
         <Input
-          placeholder="Ex: 06xxx..."
+          placeholder="Ex: 06 456 78 90"
           value={phone}
           onChange={e => setPhone(e.target.value)}
-          className="bg-slate-800 border-slate-700 text-white h-11"
+          className="bg-slate-900/50 border-slate-800 text-white h-12 rounded-xl focus:ring-emerald-500/50"
         />
-        <p className="text-[10px] text-slate-500 italic">Laisse vide pour utiliser ton numéro par défaut.</p>
+        <p className="text-[10px] text-slate-500 italic">Par défaut, nous utilisons le numéro lié à ton profil.</p>
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          onClick={() => setOpen(false)}
-          className="flex-1 h-11 border-slate-700 text-slate-300"
-        >
-          Annuler
-        </Button>
-        <Button
-          onClick={handleWithdraw}
-          disabled={loading}
-          className="flex-1 h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold"
-        >
-          {loading
-            ? <Loader2 className="w-4 h-4 animate-spin" />
-            : 'Confirmer'
-          }
-        </Button>
-      </div>
+      <Button
+        onClick={handleWithdraw}
+        disabled={loading}
+        className="w-full h-14 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-lg rounded-2xl shadow-lg shadow-emerald-900/40 transition-all active:scale-95"
+      >
+        {loading
+          ? <div className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Traitement...</div>
+          : 'Confirmer le retrait'
+        }
+      </Button>
     </div>
   )
 }
+

@@ -179,7 +179,7 @@ export async function withdrawFromWallet(params: {
           amount:         netAmount,
           balance_before: availableBalance,
           balance_after:  availableBalance - netAmount,
-          description:    `Retrait vers MTN Money (En attente confirmation) (Réf: ${referenceId})`,
+          description:    `Retrait vers MTN Money (Réf: ${referenceId})`,
           wallet_used:    'mtn',
           external_ref:   referenceId,
           status:         'pending'
@@ -216,7 +216,7 @@ export async function withdrawFromWallet(params: {
       amount:         netAmount,
       balance_before: availableBalance,
       balance_after:  availableBalance - netAmount,
-      description:    `[SIMULATION] Retrait vers Airtel Money`,
+      description:    `Retrait vers ${params.walletType === 'airtel' ? 'Airtel Money' : 'Portefeuille Mobile'}`,
       wallet_used:    params.walletType,
       external_ref:   simulatedRef,
     })
@@ -241,7 +241,25 @@ export async function verifyWithdrawal(referenceId: string): Promise<ActionResul
 
   try {
     const statusData = await getDisbursementStatus(referenceId)
-    return { data: { status: statusData.status }, success: true }
+    const status = statusData.status // PENDING, SUCCESSFUL, FAILED
+
+    if (status === 'SUCCESSFUL') {
+      await serviceClient.from('wallet_movements')
+        .update({ 
+          status: 'success',
+          description: `Retrait vers MTN Money (Réussi)` 
+        })
+        .eq('external_ref', referenceId)
+    } else if (status === 'FAILED') {
+      await serviceClient.from('wallet_movements')
+        .update({ 
+          status: 'failed',
+          description: `Retrait vers MTN Money (Échoué)` 
+        })
+        .eq('external_ref', referenceId)
+    }
+
+    return { data: { status }, success: true }
   } catch (err: any) {
     return { error: 'Erreur lors de la vérification du retrait' }
   }

@@ -6,6 +6,7 @@ interface Movement {
   type:        string
   amount:      number
   description: string
+  status:      'pending' | 'success' | 'failed'
   created_at:  string
 }
 
@@ -40,9 +41,21 @@ export function WalletMovementRow({ movement }: { movement: Movement }) {
           <p className="text-slate-500 text-xs">{formatDate(movement.created_at)}</p>
         </div>
       </div>
-      <p className={`font-bold text-sm ${config.color}`}>
-        {config.sign}{formatFCFA(movement.amount)}
-      </p>
+      <div className="flex flex-col items-end gap-1">
+        <p className={`font-bold text-sm ${config.color}`}>
+          {config.sign}{formatFCFA(movement.amount)}
+        </p>
+        {movement.status === 'pending' && (
+          <span className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full border border-amber-500/20 animate-pulse">
+            En attente
+          </span>
+        )}
+        {movement.status === 'failed' && (
+          <span className="text-[10px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full border border-red-500/20">
+            Échoué
+          </span>
+        )}
+      </div>
     </div>
   )
 }
