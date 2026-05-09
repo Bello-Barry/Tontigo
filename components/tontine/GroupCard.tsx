@@ -27,18 +27,18 @@ export function GroupCard({ group, myMembership }: GroupCardProps) {
 
   return (
     <Card className="glass-card hover:border-emerald-500/30 transition-all group overflow-hidden">
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start gap-4">
-          <CardTitle className="text-lg leading-tight truncate text-white">{group.name}</CardTitle>
+      <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-4">
+        <div className="flex justify-between items-start gap-2">
+          <CardTitle className="text-sm sm:text-lg leading-tight truncate text-white flex-1 min-w-0">{group.name}</CardTitle>
           <GroupStatusBadge status={group.status} />
         </div>
-        <div className="text-2xl font-bold text-emerald-400 mt-1">
+        <div className="text-lg sm:text-2xl font-bold text-emerald-400 mt-1">
           {formatFCFA(potSize)}
-          <span className="text-xs font-normal text-slate-400 ml-1">/ tour</span>
+          <span className="text-[10px] sm:text-xs font-normal text-slate-400 ml-1">/ tour</span>
         </div>
       </CardHeader>
       
-      <CardContent className="py-2 space-y-3 text-sm">
+      <CardContent className="py-2 space-y-2 sm:space-y-3 text-xs sm:text-sm px-3 sm:px-4">
         <div className="flex items-center justify-between text-slate-400">
           <div className="flex items-center gap-1.5">
              <Calendar className="w-4 h-4 text-blue-400" />
@@ -75,9 +75,9 @@ export function GroupCard({ group, myMembership }: GroupCardProps) {
         )}
       </CardContent>
 
-      <CardFooter className="pt-4">
+      <CardFooter className="pt-3 sm:pt-4 px-3 sm:px-4 pb-3 sm:pb-4">
         <Link href={`/tontine/${group.id}`} className="w-full">
-          <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white">
+          <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white text-xs sm:text-sm h-9 sm:h-10">
             Voir les détails
           </Button>
         </Link>

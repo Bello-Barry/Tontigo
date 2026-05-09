@@ -131,34 +131,36 @@ export default async function GroupDetailPage(props: Props) {
     .single()
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
+    <div className="p-3 sm:p-6 max-w-2xl mx-auto space-y-4 sm:space-y-6">
 
       {/* En-tête groupe */}
-      <div className="glass-card p-5 space-y-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-white">{group.name}</h1>
+      <div className="glass-card p-4 sm:p-5 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl font-bold text-white truncate">{group.name}</h1>
             {group.description && (
-              <p className="text-slate-400 text-sm mt-1">{group.description}</p>
+              <p className="text-slate-400 text-xs sm:text-sm mt-1 line-clamp-2">{group.description}</p>
             )}
           </div>
-          <GroupStatusBadge status={group.status} />
+          <div className="shrink-0">
+            <GroupStatusBadge status={group.status} />
+          </div>
         </div>
 
         {/* Infos clés */}
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          <div className="bg-slate-700/50 rounded-xl p-3">
-            <p className="text-slate-400 text-xs">Cotisation</p>
-            <p className="text-white font-bold text-lg">{formatFCFA(group.amount)}</p>
-            <p className="text-slate-400 text-xs">{getFrequencyLabel(group.frequency)}</p>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-2">
+          <div className="bg-slate-700/50 rounded-xl p-2 sm:p-3">
+            <p className="text-slate-400 text-[10px] sm:text-xs">Cotisation</p>
+            <p className="text-white font-bold text-base sm:text-lg">{formatFCFA(group.amount)}</p>
+            <p className="text-slate-400 text-[10px] sm:text-xs">{getFrequencyLabel(group.frequency)}</p>
           </div>
-          <div className="bg-slate-700/50 rounded-xl p-3">
-            <p className="text-slate-400 text-xs">Membres</p>
-            <p className="text-white font-bold text-lg flex items-center gap-1">
-              <Users className="w-4 h-4 text-emerald-400" />
+          <div className="bg-slate-700/50 rounded-xl p-2 sm:p-3">
+            <p className="text-slate-400 text-[10px] sm:text-xs">Membres</p>
+            <p className="text-white font-bold text-base sm:text-lg flex items-center gap-1">
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
               {group.current_members}/{group.max_members}
             </p>
-            <p className="text-slate-400 text-xs">Tour {group.current_turn}</p>
+            <p className="text-slate-400 text-[10px] sm:text-xs truncate">Tour {group.current_turn}</p>
           </div>
         </div>
 

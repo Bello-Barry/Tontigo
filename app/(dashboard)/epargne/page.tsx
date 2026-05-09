@@ -27,29 +27,30 @@ export default async function EpargnePage() {
   const unlockedVaults = vaults?.filter(v => v.status === 'debloque') ?? []
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
+    <div className="p-3 sm:p-6 max-w-2xl mx-auto space-y-4 sm:space-y-6">
 
       {/* En-tête */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Épargne</h1>
-          <p className="text-slate-400 text-sm mt-1">{vaults?.length ?? 0} coffre{(vaults?.length ?? 0) > 1 ? 's' : ''}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Épargne</h1>
+          <p className="text-slate-400 text-xs sm:text-sm mt-0.5 sm:mt-1">{vaults?.length ?? 0} coffre{(vaults?.length ?? 0) > 1 ? 's' : ''}</p>
         </div>
-        <Link href="/epargne/create">
-          <Button className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2">
+        <Link href="/epargne/create" className="shrink-0">
+          <Button className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2" size="sm">
             <Plus className="w-4 h-4" />
-            Nouveau coffre
+            <span className="hidden sm:inline">Nouveau coffre</span>
+            <span className="sm:hidden">Nouveau</span>
           </Button>
         </Link>
       </div>
 
       {/* Solde total */}
       {(vaults?.length ?? 0) > 0 && (
-        <div className="glass-card p-5 space-y-1">
+        <div className="glass-card p-4 sm:p-5 space-y-1">
           <p className="text-slate-400 text-sm flex items-center gap-2">
             <Lock className="w-4 h-4" /> Total épargné (bloqué)
           </p>
-          <p className="text-3xl font-bold likelemba-gradient-text">{formatFCFA(totalBalance)}</p>
+          <p className="text-2xl sm:text-3xl font-bold likelemba-gradient-text break-all">{formatFCFA(totalBalance)}</p>
           <p className="text-slate-500 text-xs">
             {activeVaults.length} coffre{activeVaults.length > 1 ? 's' : ''} actif{activeVaults.length > 1 ? 's' : ''}
             {unlockedVaults.length > 0 && ` · ${unlockedVaults.length} prêt${unlockedVaults.length > 1 ? 's' : ''} au retrait`}

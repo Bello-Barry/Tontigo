@@ -147,3 +147,38 @@ input, textarea, select {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+/* Safe area for iPhones with notch/Dynamic Island */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+}
+
+/* Text wrapping balance */
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Hidden scrollbar utility */
+.scroll-x-hidden {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scroll-x-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* Minimum touch target (44px = Apple/Google standard) */
+.touch-target {
+  min-height: 44px;
+  min-width:  44px;
+}
+
+/* Hide scrollbar on any element */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

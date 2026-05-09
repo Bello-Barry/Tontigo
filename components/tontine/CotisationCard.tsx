@@ -100,31 +100,31 @@ export function CotisationCard({ contribution, penaltyRate, userId }: Cotisation
       isLate ? 'border-l-red-500' : 
       'border-l-blue-500'
     }`}>
-      <CardContent className="p-4 flex items-center justify-between">
-        <div className="space-y-1">
-          <p className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
-            <Calendar className="w-3 h-3" />
+      <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-3">
+        <div className="space-y-1 min-w-0">
+          <p className="text-[10px] sm:text-xs text-slate-400 flex items-center gap-1 sm:gap-1.5 font-medium truncate">
+            <Calendar className="w-3 h-3 shrink-0" />
             Échéance: {formatDate(contribution.due_date)}
           </p>
-          <div className="text-2xl font-bold text-white tracking-tight">
+          <div className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
             {formatFCFA(totalAmount)}
           </div>
           {penaltyAmount > 0 && (
-            <p className="text-[10px] text-red-400 flex items-center gap-1 font-bold uppercase tracking-wider">
-              <AlertTriangle className="w-3 h-3" /> Inclut {formatFCFA(penaltyAmount)} d'amende
+            <p className="text-[9px] sm:text-[10px] text-red-400 flex items-center gap-1 font-bold uppercase tracking-wider">
+              <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" /> Inclut {formatFCFA(penaltyAmount)} d'amende
             </p>
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-1.5 sm:gap-2 shrink-0">
           {isPaid ? (
-            <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
-              <CheckCircle2 className="w-4 h-4" /> PAYÉ
+            <div className="flex items-center gap-1 sm:gap-1.5 text-emerald-400 font-bold text-[10px] sm:text-xs bg-emerald-500/10 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-emerald-500/20">
+              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> PAYÉ
             </div>
           ) : (
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
               <DialogTrigger render={
-                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6">
+                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 sm:px-6 h-9 sm:h-10 text-xs sm:text-sm">
                   Payer
                 </Button>
               } />

@@ -23,11 +23,11 @@ export function VaultCard({ vault }: { vault: SavingsVault }) {
         </div>
       )}
       
-      <CardContent className="p-5 flex-1 relative z-10 flex flex-col">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="font-bold text-lg">{vault.name}</h3>
-            {vault.description && <p className="text-xs text-muted-foreground">{vault.description}</p>}
+      <CardContent className="p-3 sm:p-5 flex-1 relative z-10 flex flex-col">
+        <div className="flex justify-between items-start gap-2 mb-3 sm:mb-4">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold text-sm sm:text-lg truncate">{vault.name}</h3>
+            {vault.description && <p className="text-xs text-muted-foreground truncate">{vault.description}</p>}
           </div>
           {isUnlocked ? (
             <Badge className="bg-emerald-500/20 text-emerald-500 border-none"><Unlock className="w-3 h-3 mr-1"/> Débloqué</Badge>
@@ -38,7 +38,7 @@ export function VaultCard({ vault }: { vault: SavingsVault }) {
           )}
         </div>
 
-        <div className="text-3xl font-extrabold mb-1">{formatFCFA(vault.current_balance)}</div>
+        <div className="text-xl sm:text-3xl font-extrabold mb-1 break-all">{formatFCFA(vault.current_balance)}</div>
         {vault.target_amount && (
           <div className="flex items-center justify-between text-xs text-muted-foreground mt-4 mb-1.5">
             <span>Progression</span>
@@ -54,8 +54,8 @@ export function VaultCard({ vault }: { vault: SavingsVault }) {
           </div>
         )}
 
-        <Link href={`/epargne/${vault.id}`} className="mt-4 w-full">
-          <Button variant={isUnlocked ? "default" : "outline"} className="w-full">
+        <Link href={`/epargne/${vault.id}`} className="mt-3 sm:mt-4 w-full">
+          <Button variant={isUnlocked ? "default" : "outline"} className="w-full text-xs sm:text-sm h-9 sm:h-10">
             {isUnlocked ? "Retirer les fonds" : "Voir / Dépôt"}
           </Button>
         </Link>

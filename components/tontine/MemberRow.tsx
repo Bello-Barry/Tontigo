@@ -23,7 +23,7 @@ export function MemberRow({ membership, isCurrentUser, isCreator, groupId }: Mem
   const { user, turn_position, guarantee_amount, status, total_paid, has_received_payout } = membership
 
   return (
-    <div className={`flex items-center justify-between p-4 ${isCurrentUser ? 'bg-slate-800/30' : 'bg-transparent'}`}>
+    <div className={`flex items-center justify-between p-3 sm:p-4 ${isCurrentUser ? 'bg-slate-800/30' : 'bg-transparent'}`}>
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-700">
           {turn_position}
@@ -36,14 +36,14 @@ export function MemberRow({ membership, isCurrentUser, isCreator, groupId }: Mem
           </AvatarFallback>
         </Avatar>
         
-        <div>
-          <p className="font-semibold text-white flex items-center gap-2 text-sm">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-white flex items-center gap-1.5 text-xs sm:text-sm truncate">
             {user.full_name}
-            {isCurrentUser && <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Moi</span>}
+            {isCurrentUser && <span className="text-[8px] sm:text-[10px] bg-slate-700 text-slate-400 px-1 sm:px-1.5 py-0.5 rounded uppercase font-bold tracking-wider shrink-0">Moi</span>}
           </p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <TrustScoreBadge score={user.trust_score} size="sm" />
-            {status === 'fugitif' && <Badge variant="destructive" className="h-4 px-1 text-[9px] font-bold">Fugitif</Badge>}
+          <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5">
+            <TrustScoreBadge score={user.trust_score} size="xs" />
+            {status === 'fugitif' && <Badge variant="destructive" className="h-3.5 px-1 text-[8px] font-bold">Fugitif</Badge>}
           </div>
         </div>
       </div>
@@ -55,14 +55,14 @@ export function MemberRow({ membership, isCurrentUser, isCreator, groupId }: Mem
         </div>
 
         {/* Status icon or Dropdown for actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {has_received_payout ? (
-            <div className="p-1.5 rounded-full bg-emerald-500/10 text-emerald-500" title="A déjà reçu sa cagnotte">
-              <CheckCircle2 className="w-5 h-5" />
+            <div className="p-1 sm:p-1.5 rounded-full bg-emerald-500/10 text-emerald-500" title="A déjà reçu sa cagnotte">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           ) : (
-            <div className="p-1.5 rounded-full bg-slate-800 text-slate-500" title="En attente de son tour">
-              <AlertCircle className="w-5 h-5" />
+            <div className="p-1 sm:p-1.5 rounded-full bg-slate-800 text-slate-500" title="En attente de son tour">
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           )}
 

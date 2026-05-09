@@ -19,57 +19,59 @@ export function MobileNav() {
   ]
 
   return (
-    <nav className="md:hidden fixed bottom-0 w-full border-t bg-card h-16 flex items-center justify-around px-2 pb-safe z-50">
-      {NAV_ITEMS.map((item) => {
-        const Icon = item.icon
-        const isActive = pathname === item.href
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-md border-t border-slate-800">
+      <div className="flex items-center justify-around px-2 py-2 pb-safe">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
-        if (item.href === '/profile') {
+          if (item.href === '/profile') {
+            return (
+              <Link
+                key={item.href}
+                href="/profile"
+                className={cn(
+                  "flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-[52px] transition-colors touch-target",
+                  isActive ? "text-emerald-400" : "text-slate-500"
+                )}
+              >
+                <div className={cn(
+                  "relative w-5 h-5 rounded-full overflow-hidden border",
+                  isActive ? "border-emerald-400" : "border-transparent bg-slate-700"
+                )}>
+                  {user?.avatar_url ? (
+                    <Image
+                      src={user.avatar_url}
+                      alt={user.full_name ?? ''}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                      key={user.avatar_url}
+                    />
+                  ) : (
+                    <User className="w-full h-full p-0.5" />
+                  )}
+                </div>
+                <span className="text-[9px] font-medium leading-none">{item.label}</span>
+              </Link>
+            )
+          }
+
           return (
             <Link
               key={item.href}
-              href="/profile"
+              href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground"
+                "flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-[52px] transition-colors touch-target",
+                isActive ? "text-emerald-400" : "text-slate-500"
               )}
             >
-              <div className={cn(
-                "relative w-5 h-5 rounded-full overflow-hidden border",
-                isActive ? "border-primary" : "border-transparent bg-slate-700"
-              )}>
-                {user?.avatar_url ? (
-                  <Image
-                    src={user.avatar_url}
-                    alt={user.full_name ?? ''}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                    key={user.avatar_url}
-                  />
-                ) : (
-                  <User className="w-full h-full p-0.5" />
-                )}
-              </div>
-              <span className="text-[10px]">{item.label}</span>
+              <Icon className="w-5 h-5" />
+              <span className="text-[9px] font-medium leading-none">{item.label}</span>
             </Link>
           )
-        }
-
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-colors",
-              item.href === '/portefeuille' ? "text-emerald-500" : (isActive ? "text-primary" : "text-muted-foreground")
-            )}
-          >
-            <Icon className="w-5 h-5" />
-            <span className="text-[10px]">{item.label}</span>
-          </Link>
-        )
-      })}
+        })}
+      </div>
     </nav>
   )
 }

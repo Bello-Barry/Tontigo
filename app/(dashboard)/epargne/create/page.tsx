@@ -47,17 +47,17 @@ export default function CreateVaultPage() {
   }
 
   return (
-    <div className="p-6 max-w-lg mx-auto space-y-6">
+    <div className="p-3 sm:p-6 max-w-lg mx-auto space-y-4 sm:space-y-6">
       {/* En-tête */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         <Link href="/epargne">
-          <button className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors">
+          <button className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors touch-target flex items-center justify-center">
             <ArrowLeft className="w-5 h-5 text-slate-400" />
           </button>
         </Link>
-        <div>
-          <h1 className="text-xl font-bold text-white">Nouveau coffre</h1>
-          <p className="text-slate-400 text-sm">Configure ton épargne bloquée</p>
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold text-white">Nouveau coffre</h1>
+          <p className="text-slate-400 text-xs sm:text-sm truncate">Configure ton épargne bloquée</p>
         </div>
       </div>
 

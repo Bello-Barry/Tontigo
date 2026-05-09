@@ -52,34 +52,34 @@ export default async function TontinePage() {
   const termines   = groups.filter(g => g.status === 'termine')
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-3 sm:p-6 max-w-4xl mx-auto space-y-4 sm:space-y-6">
 
       {/* En-tête */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Mes Tontines</h1>
-          <p className="text-slate-400 text-sm mt-1">{groups.length} groupe{groups.length > 1 ? 's' : ''}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Mes Tontines</h1>
+          <p className="text-slate-400 text-xs sm:text-sm mt-0.5 sm:mt-1">{groups.length} groupe{groups.length > 1 ? 's' : ''}</p>
         </div>
-        <Link href="/tontine/create">
-          <Button className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2">
+        <Link href="/tontine/create" className="shrink-0">
+          <Button className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2" size="sm">
             <Plus className="w-4 h-4" />
-            Créer
+            <span className="hidden sm:inline">Créer</span>
           </Button>
         </Link>
       </div>
 
       {/* Actions rapides */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <Link href="/tontine/join">
-          <button type="button" className="w-full glass-card p-4 flex items-center gap-3 hover:border-emerald-500/50 transition-colors">
-            <QrCode className="w-5 h-5 text-emerald-400" />
-            <span className="text-white text-sm font-medium">Rejoindre par code</span>
+          <button type="button" className="w-full glass-card p-3 sm:p-4 flex items-center gap-2 sm:gap-3 hover:border-emerald-500/50 transition-colors touch-target">
+            <QrCode className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 shrink-0" />
+            <span className="text-white text-xs sm:text-sm font-medium truncate">Rejoindre par code</span>
           </button>
         </Link>
         <Link href="/matching">
-          <button type="button" className="w-full glass-card p-4 flex items-center gap-3 hover:border-emerald-500/50 transition-colors">
-            <Search className="w-5 h-5 text-emerald-400" />
-            <span className="text-white text-sm font-medium">Trouver un groupe</span>
+          <button type="button" className="w-full glass-card p-3 sm:p-4 flex items-center gap-2 sm:gap-3 hover:border-emerald-500/50 transition-colors touch-target">
+            <Search className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 shrink-0" />
+            <span className="text-white text-xs sm:text-sm font-medium truncate">Trouver un groupe</span>
           </button>
         </Link>
       </div>

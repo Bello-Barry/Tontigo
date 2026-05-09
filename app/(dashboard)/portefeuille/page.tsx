@@ -19,33 +19,33 @@ export default async function PortefeuillePage() {
   const hasBalance = Number(wallet.total_balance) > 0
 
   return (
-    <div className="p-4 sm:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="p-3 sm:p-4 md:p-8 max-w-4xl mx-auto space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-900/20 border border-slate-800 p-8 sm:p-12 shadow-2xl">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px] -mr-32 -mt-32 rounded-full" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 blur-[100px] -ml-32 -mb-32 rounded-full" />
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-900/20 border border-slate-800 p-5 sm:p-8 md:p-12 shadow-2xl">
+        <div className="absolute top-0 right-0 w-40 sm:w-64 h-40 sm:h-64 bg-emerald-500/10 blur-[100px] -mr-20 sm:-mr-32 -mt-20 sm:-mt-32 rounded-full" />
+        <div className="absolute bottom-0 left-0 w-40 sm:w-64 h-40 sm:h-64 bg-indigo-500/10 blur-[100px] -ml-20 sm:-ml-32 -mb-20 sm:-mb-32 rounded-full" />
         
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="text-center md:text-left space-y-4">
+        <div className="relative z-10 flex flex-col sm:flex-row justify-between items-center gap-4 sm:gap-8">
+          <div className="text-center sm:text-left space-y-2 sm:space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
               <ShieldCheck className="w-3 h-3" />
               Compte Sécurisé
             </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight">
               Mon Portefeuille
             </h1>
-            <p className="text-slate-400 max-w-md">
+            <p className="text-slate-400 text-sm max-w-md hidden sm:block">
               Gère tes gains de tontines et tes épargnes débloquées en un seul endroit.
             </p>
           </div>
 
-          <div className="flex flex-col items-center md:items-end gap-2 bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-inner">
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">Solde Total Disponible</p>
-            <p className="text-5xl sm:text-6xl font-black text-white tracking-tighter">
+          <div className="flex flex-col items-center sm:items-end gap-2 bg-white/5 backdrop-blur-xl p-5 sm:p-8 rounded-2xl sm:rounded-3xl border border-white/10 shadow-inner w-full sm:w-auto">
+            <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">Solde Total</p>
+            <p className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tighter break-all">
               {formatFCFA(wallet.total_balance)}
             </p>
-            <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold mt-2">
+            <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold mt-1 sm:mt-2">
               <Sparkles className="w-3.5 h-3.5 animate-pulse" />
               Fonds prêts pour retrait
             </div>
@@ -53,10 +53,10 @@ export default async function PortefeuillePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
         
         {/* Colonne Gauche: Détails et Actions */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="md:col-span-2 space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <WalletCard
               icon={<TrendingUp className="w-6 h-6 text-emerald-400" />}
@@ -77,10 +77,10 @@ export default async function PortefeuillePage() {
           </div>
 
           {hasBalance ? (
-            <div className="glass-card p-6 border-slate-800 space-y-6">
+            <div className="glass-card p-4 sm:p-6 border-slate-800 space-y-4 sm:space-y-6">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
-                <Download className="w-5 h-5 text-emerald-400" />
-                <h2 className="text-white font-bold">Retrait de fonds</h2>
+                <Download className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                <h2 className="text-white font-bold text-sm sm:text-base">Retrait de fonds</h2>
               </div>
               
               <div className="grid grid-cols-1 gap-4">
@@ -112,7 +112,7 @@ export default async function PortefeuillePage() {
               </div>
             </div>
           ) : (
-             <div className="glass-card p-12 text-center border-dashed border-slate-800">
+             <div className="glass-card p-8 sm:p-12 text-center border-dashed border-slate-800">
                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
                  <Wallet className="w-8 h-8 text-slate-600" />
                </div>
@@ -123,7 +123,7 @@ export default async function PortefeuillePage() {
         </div>
 
         {/* Colonne Droite: Historique */}
-        <div className="lg:col-span-1">
+        <div className="md:col-span-1">
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-white font-bold flex items-center gap-2">

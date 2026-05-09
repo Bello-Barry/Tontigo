@@ -43,13 +43,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Bonjour, {profile?.full_name?.split(' ')[0]} 👋</h2>
-          <p className="text-muted-foreground mt-1">Voici le résumé de votre activité financière.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight truncate">Bonjour, {profile?.full_name?.split(' ')[0]} 👋</h2>
+          <p className="text-muted-foreground text-sm mt-0.5 sm:mt-1 truncate">Voici le résumé de votre activité financière.</p>
         </div>
-        <div className="flex items-center gap-2">
-           <span className="text-sm text-muted-foreground">Votre score de confiance:</span>
+        <div className="flex items-center gap-2 shrink-0">
+           <span className="text-xs sm:text-sm text-muted-foreground">Score:</span>
            <TrustScoreBadge score={profile?.trust_score || 50} />
         </div>
       </div>
@@ -57,21 +57,21 @@ export default async function DashboardPage() {
       {/* Widget Portefeuille */}
       {walletData && Number(walletData.total_balance) > 0 && (
         <Link href="/portefeuille">
-          <div className="glass-card p-4 border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                  <Wallet className="w-5 h-5 text-emerald-400" />
+          <div className="glass-card p-3 sm:p-4 border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
+                  <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
                 </div>
-                <div>
-                  <p className="text-slate-400 text-xs">💰 Disponible pour retrait</p>
-                  <p className="text-emerald-400 font-bold text-xl mt-0.5">
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-xs truncate">💰 Disponible pour retrait</p>
+                  <p className="text-emerald-400 font-bold text-lg sm:text-xl mt-0.5 truncate">
                     {formatFCFA(walletData.total_balance)}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1 text-emerald-400 text-sm font-medium">
-                Retirer <ChevronRight className="w-4 h-4" />
+              <div className="flex items-center gap-1 text-emerald-400 text-xs sm:text-sm font-medium shrink-0">
+                <span className="hidden sm:inline">Retirer</span> <ChevronRight className="w-4 h-4" />
               </div>
             </div>
           </div>
@@ -79,7 +79,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Cartes de synthèse */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card className="glass-card border-green-500/20 shadow-lg shadow-green-500/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Tontines Actives</CardTitle>
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
       <DashboardCharts transactions={transactions || []} />
 
       {/* Actions rapides */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Card className="hover:border-primary/50 transition-colors">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

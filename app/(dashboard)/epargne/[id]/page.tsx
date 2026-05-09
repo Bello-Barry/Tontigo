@@ -40,25 +40,25 @@ export default async function VaultDetailPage(props: Props) {
     : null
 
   return (
-    <div className="p-6 max-w-lg mx-auto space-y-6">
+    <div className="p-3 sm:p-6 max-w-lg mx-auto space-y-4 sm:space-y-6">
 
       {/* En-tête */}
-      <div className="glass-card p-5 space-y-4">
+      <div className="glass-card p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-3">
           {isUnlocked
-            ? <LockOpen className="w-8 h-8 text-emerald-400" />
-            : <Lock className="w-8 h-8 text-amber-400" />
+            ? <LockOpen className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400 shrink-0" />
+            : <Lock className="w-6 h-6 sm:w-8 sm:h-8 text-amber-400 shrink-0" />
           }
-          <div>
-            <h1 className="text-xl font-bold text-white">{vault.name}</h1>
-            {vault.description && <p className="text-slate-400 text-sm">{vault.description}</p>}
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl font-bold text-white truncate">{vault.name}</h1>
+            {vault.description && <p className="text-slate-400 text-xs sm:text-sm truncate">{vault.description}</p>}
           </div>
         </div>
 
         {/* Solde */}
-        <div className="text-center py-4">
-          <p className="text-slate-400 text-sm">Solde actuel</p>
-          <p className="text-4xl font-bold likelemba-gradient-text mt-1">
+        <div className="text-center py-2 sm:py-4">
+          <p className="text-slate-400 text-[10px] sm:text-sm uppercase tracking-wider font-medium">Solde actuel</p>
+          <p className="text-3xl sm:text-4xl font-bold likelemba-gradient-text mt-1 break-all px-2">
             {formatFCFA(vault.current_balance)}
           </p>
           {vault.target_amount && (

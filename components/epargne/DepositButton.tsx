@@ -74,29 +74,29 @@ export function DepositButton({ vaultId }: { vaultId: string }) {
       <Button
         onClick={() => setOpen(true)}
         variant="outline"
-        className="w-full h-12 border-slate-700 text-slate-300 hover:bg-slate-800 gap-2"
+        className="w-full h-11 sm:h-12 border-slate-700 text-slate-300 hover:bg-slate-800 gap-2 text-xs sm:text-sm"
       >
-        <Plus className="w-4 h-4" /> Ajouter de l'argent
+        <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Ajouter de l'argent
       </Button>
     )
   }
 
   return (
-    <div className="glass-card p-4 space-y-4">
-      <p className="text-white font-medium">Ajouter un versement</p>
+    <div className="glass-card p-3 sm:p-4 space-y-3 sm:space-y-4">
+      <p className="text-white font-medium text-sm sm:text-base">Ajouter un versement</p>
       <Input
         type="number"
         placeholder="Montant en FCFA"
         value={amount}
         onChange={e => setAmount(e.target.value)}
-        className="bg-slate-800 border-slate-700 text-white h-12"
+        className="bg-slate-800 border-slate-700 text-white h-11 sm:h-12 text-sm sm:text-base"
       />
       <div className="flex gap-2">
         {(['mtn', 'airtel'] as const).map(w => (
           <button
             key={w}
             onClick={() => setWallet(w)}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+            className={`flex-1 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
               wallet === w
                 ? w === 'mtn' ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'
                 : 'bg-slate-700 text-slate-400'
@@ -117,12 +117,12 @@ export function DepositButton({ vaultId }: { vaultId: string }) {
         />
         <p className="text-[10px] text-slate-500 italic">Laisse vide pour utiliser ton numéro par défaut.</p>
       </div>
-      <div className="flex gap-3">
-        <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 border-slate-700 text-slate-300">
+      <div className="flex gap-2 sm:gap-3">
+        <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 h-10 sm:h-11 border-slate-700 text-slate-300 text-xs sm:text-sm">
           Annuler
         </Button>
-        <Button onClick={handleDeposit} disabled={loading} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white">
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirmer'}
+        <Button onClick={handleDeposit} disabled={loading} className="flex-1 h-10 sm:h-11 bg-emerald-500 hover:bg-emerald-600 text-white text-xs sm:text-sm">
+          {loading ? <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" /> : 'Confirmer'}
         </Button>
       </div>
     </div>
