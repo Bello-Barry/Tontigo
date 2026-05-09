@@ -42,7 +42,7 @@ export function MemberRow({ membership, isCurrentUser, isCreator, groupId }: Mem
             {isCurrentUser && <span className="text-[8px] sm:text-[10px] bg-slate-700 text-slate-400 px-1 sm:px-1.5 py-0.5 rounded uppercase font-bold tracking-wider shrink-0">Moi</span>}
           </p>
           <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5">
-            <TrustScoreBadge score={user.trust_score} size="xs" />
+            <TrustScoreBadge score={user.trust_score} size="sm" />
             {status === 'fugitif' && <Badge variant="destructive" className="h-3.5 px-1 text-[8px] font-bold">Fugitif</Badge>}
           </div>
         </div>
