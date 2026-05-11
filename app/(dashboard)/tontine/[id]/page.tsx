@@ -270,7 +270,6 @@ export default async function GroupDetailPage(props: Props) {
         groupId={group.id} 
         currentUserId={user.id}
         currentUserProfile={{ full_name: profile?.full_name || 'Utilisateur', avatar_url: profile?.avatar_url || null }}
-        members={memberships || []} 
       />
     </div>
   )
