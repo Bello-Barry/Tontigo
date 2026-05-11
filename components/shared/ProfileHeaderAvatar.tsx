@@ -2,6 +2,7 @@
 import { useAuthStore } from '@/lib/stores/authStore'
 import Image from 'next/image'
 import { useEffect } from 'react'
+import { sanitizeUrl } from "@/lib/utils/format"
 
 export function ProfileHeaderAvatar({ initialProfile }: { initialProfile: any }) {
   const { user, setUser } = useAuthStore()
@@ -19,7 +20,7 @@ export function ProfileHeaderAvatar({ initialProfile }: { initialProfile: any })
     <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center overflow-hidden relative">
       {avatarUrl ? (
         <Image
-          src={avatarUrl}
+          src={sanitizeUrl(avatarUrl)!}
           alt="Avatar"
           fill
           className="object-cover"

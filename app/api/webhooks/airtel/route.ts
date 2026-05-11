@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server'
 import { serviceClient } from '@/lib/supabase/service'
+import { validateWebhookSecret } from '@/lib/utils/security'
 
 export async function POST(request: Request) {
   try {
+    // 0. Vérifier le secret du webhook
+    if (!(await validateWebhookSecret())) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const payload = await request.json()
     console.log('Airtel webhook payload:', payload)
 

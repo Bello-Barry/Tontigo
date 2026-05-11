@@ -9,6 +9,7 @@ import {
 import { ThemeToggle } from './ThemeToggle'
 import { useAuthStore } from '@/lib/stores/authStore'
 import { cn } from '@/lib/utils'
+import { sanitizeUrl } from "@/lib/utils/format"
 
 export function Sidebar() {
   const { user } = useAuthStore()
@@ -79,7 +80,7 @@ export function Sidebar() {
           <Link href="/profile" className="flex items-center gap-3 group">
             <div className="relative w-10 h-10 rounded-xl overflow-hidden ring-2 ring-emerald-500/20 group-hover:ring-emerald-500/50 transition-all">
               {user?.avatar_url ? (
-                <Image src={user.avatar_url} alt={user.full_name ?? ''} fill className="object-cover" />
+                <Image src={sanitizeUrl(user.avatar_url)!} alt={user.full_name ?? ''} fill className="object-cover" />
               ) : (
                 <div className="w-full h-full bg-slate-800 flex items-center justify-center text-white font-bold text-sm">
                   {user?.full_name?.[0] ?? '?'}
@@ -105,4 +106,3 @@ export function Sidebar() {
     </aside>
   )
 }
-

@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
 import { serviceClient } from '@/lib/supabase/service'
 import { revalidatePath } from 'next/cache'
+import { validateWebhookSecret } from '@/lib/utils/security'
+import { getCollectionStatus } from '@/lib/momo'
 
 export async function POST(req: Request) {
   try {
+    // 0. Vérifier le secret du webhook
+    if (!(await validateWebhookSecret())) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
     console.log('MTN MoMo Collection Callback received:', body)
 
@@ -13,7 +20,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing externalId' }, { status: 400 })
     }
 
-    if (status === 'SUCCESSFUL') {
+    // 0b. Double vérification avec l'API MTN pour éviter le spoofing du payload
+    const realStatusData = await getCollectionStatus(externalId)
+    const realStatus = realStatusData.status
+
+    if (realStatus === 'SUCCESSFUL') {
       // 1. Chercher dans les COTISATIONS (Tontine)
       const { data: contribution } = await serviceClient
         .from('contributions')
@@ -103,7 +114,7 @@ export async function POST(req: Request) {
           revalidatePath(`/epargne/${vaultId}`)
         }
       }
-    } else if (status === 'FAILED' || status === 'REJECTED') {
+    } else if (realStatus === 'FAILED' || realStatus === 'REJECTED') {
       // Gérer l'échec
       await serviceClient.from('transactions')
         .update({ status: 'failed' })
