@@ -1,45 +1,45 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { MessageSquare, X, Send, Loader2, Trash2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { sendMessage, sendAudioMessage, deleteMessage } from '@/lib/actions/chat.actions'
-import { toast } from 'react-toastify'
-import { format } from 'date-fns'
+import { createPortal } from 'react-dom'
+import {
+  MessageSquare, X, Send, Loader2, Bot,
+  Trash2, Copy, Check, Volume2, VolumeX, RefreshCw, AlertCircle
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { AudioRecorder } from './AudioRecorder'
+import { createClient } from '@/lib/supabase/client'
+import { format } from 'date-fns'
+import { toast } from 'react-toastify'
+import { deleteMessage } from '@/lib/actions/chat.actions'
 import { AudioPlayer } from './AudioPlayer'
-import { createPortal } from 'react-dom'
+import { AudioRecorder } from './AudioRecorder'
+import { sanitizeUrl } from "@/lib/utils/format"
 
 interface GroupChatProps {
   groupId: string
   currentUserId: string
   currentUserProfile: any
-  members?: any[]
 }
 
-export function GroupChat({ groupId, currentUserId, currentUserProfile, members }: GroupChatProps) {
+export function GroupChat({ groupId, currentUserId, currentUserProfile }: GroupChatProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [messages, setMessages] = useState<any[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
-  const [mounted, setMounted] = useState(false)
+
+  const supabase = createClient()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
-    return () => setMounted(false)
   }, [])
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !groupId) return
+
     let isMounted = true
 
     const loadMessages = async () => {
@@ -50,44 +50,33 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
         .eq('group_id', groupId)
         .eq('is_deleted', false)
         .order('created_at', { ascending: true })
-        .limit(100)
 
       if (error) {
-        if (isMounted) toast.error("Impossible de charger les messages")
-      } else {
-        if (isMounted) setMessages(data || [])
+        toast.error("Impossible de charger les messages")
+      } else if (isMounted) {
+        setMessages(data || [])
+        setTimeout(() => scrollToBottom(), 100)
       }
-      if (isMounted) {
-        setIsLoading(false)
-        setTimeout(scrollToBottom, 100)
-      }
+      setIsLoading(false)
     }
 
     loadMessages()
 
     const channel = supabase
-      .channel(`chat:${groupId}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
+      .channel(`group-chat-${groupId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
         table: 'group_messages',
         filter: `group_id=eq.${groupId}`
-      }, async (payload: any) => {
+      }, (payload: any) => {
         if (!isMounted) return
-        setMessages((prev) => {
-          const exists = prev.some(m => m.id === payload.new.id)
-          if (exists) return prev
 
-          const tempIndex = prev.findIndex(m =>
-            m.id.startsWith('temp-') &&
-            (m.content === payload.new.content || (m.message_type === 'audio' && payload.new.message_type === 'audio')) &&
-            m.user_id === payload.new.user_id
-          )
-
-          if (tempIndex !== -1) {
-            const updated = [...prev]
-            updated[tempIndex] = { ...payload.new, user: prev[tempIndex].user } as any
-            return updated
+        setMessages(prev => {
+          // Éviter les doublons avec l'UI optimiste
+          const exists = prev.some(m => m.id === payload.new.id || (m.isPending && m.content === payload.new.content))
+          if (exists) {
+            return prev.map(m => (m.isPending && m.content === payload.new.content) ? { ...payload.new, isPending: false } : m)
           }
 
           const loadOtherProfile = async () => {
@@ -121,7 +110,11 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
     }
   }, [isOpen, groupId, supabase])
 
-    const handleSendMessage = async (e?: React.FormEvent) => {
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     const trimmed = newMessage.trim()
     if (!trimmed || isSending) return
@@ -242,7 +235,7 @@ export function GroupChat({ groupId, currentUserId, currentUserProfile, members 
                     {!isMe && (
                       <div className="w-8 h-8 rounded-full bg-slate-800 shrink-0 overflow-hidden border border-slate-700">
                         {sender.avatar_url ? (
-                          <img src={sender.avatar_url} alt="" className="w-full h-full object-cover" />
+                          <img src={sanitizeUrl(sender.avatar_url)} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-400">
                             {(sender.full_name || 'M')[0].toUpperCase()}

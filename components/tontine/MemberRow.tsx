@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { TrustScoreBadge } from '@/components/shared/TrustScoreBadge'
 import { CheckCircle2, AlertCircle, ShieldAlert, MoreVertical, Ban } from 'lucide-react'
 import type { Membership, UserProfile } from '@/lib/types'
-import { formatFCFA } from '@/lib/utils/format'
+import { formatFCFA, sanitizeUrl } from '@/lib/utils/format'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +30,7 @@ export function MemberRow({ membership, isCurrentUser, isCreator, groupId }: Mem
         </div>
         
         <Avatar className="h-10 w-10 border-slate-700">
-          <AvatarImage src={user.avatar_url || ''} />
+          <AvatarImage src={sanitizeUrl(user.avatar_url) || ''} />
           <AvatarFallback className="bg-slate-700 text-slate-300">
             {user.full_name?.substring(0, 2).toUpperCase()}
           </AvatarFallback>

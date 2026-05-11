@@ -36,3 +36,28 @@ export function getFrequencyLabel(frequency: string): string {
   }
   return labels[frequency] ?? frequency
 }
+
+/**
+ * Assainit une URL pour éviter les attaques XSS (ex: javascript:alert(1))
+ * Autorise uniquement http, https, et les chemins relatifs.
+ */
+export function sanitizeUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+
+  const trimmed = url.trim()
+
+  // Autoriser les chemins relatifs (commençant par /)
+  if (trimmed.startsWith('/')) return trimmed
+
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return trimmed
+    }
+  } catch (e) {
+    // Si ce n'est pas une URL valide mais que ça ne semble pas dangereux (pas de proto)
+    if (!trimmed.includes(':')) return trimmed
+  }
+
+  return undefined
+}

@@ -5,6 +5,7 @@ import { Home, Users, Target, Wallet, User } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/authStore'
 import { cn } from '@/lib/utils'
+import { sanitizeUrl } from "@/lib/utils/format"
 
 export function MobileNav() {
   const { user } = useAuthStore()
@@ -41,7 +42,7 @@ export function MobileNav() {
                 )}>
                   {user?.avatar_url ? (
                     <Image
-                      src={user.avatar_url}
+                      src={sanitizeUrl(user.avatar_url)!}
                       alt={user.full_name ?? ''}
                       fill
                       className="object-cover"
