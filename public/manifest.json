@@ -4,8 +4,8 @@
   "description": "L'épargne et la tontine sécurisée au Congo",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#020617",
-  "theme_color": "#10b981",
+  "background_color": "#0a2a22",
+  "theme_color": "#0a2a22",
   "icons": [
     {
       "src": "/icon-192.png",
