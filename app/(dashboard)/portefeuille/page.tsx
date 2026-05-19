@@ -16,7 +16,16 @@ export default async function PortefeuillePage() {
   if (result.error || !result.data) redirect('/dashboard')
 
   const { wallet, movements } = result.data
-  const hasBalance = Number(wallet.total_balance) > 0
+
+  // Correction chirurgicale : Calcul du solde d'épargne débloquée à partir de l'historique
+  const savingsBalance = Math.max(
+    Number(wallet.savings_balance || 0),
+    movements
+      .filter(m => m.type === 'savings_credit')
+      .reduce((acc, m) => acc + Number(m.amount), 0)
+  )
+  const totalBalance = Number(wallet.tontine_balance || 0) + savingsBalance
+  const hasBalance = totalBalance > 0
 
   return (
     <div className="p-3 sm:p-4 md:p-8 max-w-4xl mx-auto space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -43,7 +52,7 @@ export default async function PortefeuillePage() {
           <div className="flex flex-col items-center sm:items-end gap-2 bg-white/5 backdrop-blur-xl p-5 sm:p-8 rounded-2xl sm:rounded-3xl border border-white/10 shadow-inner w-full sm:w-auto">
             <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">Solde Total</p>
             <p className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tighter break-all">
-              {formatFCFA(wallet.total_balance)}
+              {formatFCFA(totalBalance)}
             </p>
             <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold mt-1 sm:mt-2">
               <Sparkles className="w-3.5 h-3.5 animate-pulse" />
@@ -69,7 +78,7 @@ export default async function PortefeuillePage() {
             <WalletCard
               icon={<PiggyBank className="w-6 h-6 text-blue-400" />}
               title="Épargne Débloquée"
-              balance={Number(wallet.savings_balance)}
+              balance={savingsBalance}
               lastCreditAt={wallet.last_savings_credit_at}
               emptyMessage="Aucune épargne disponible"
               colorClass="border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 transition-all duration-300 group"
@@ -92,19 +101,19 @@ export default async function PortefeuillePage() {
                     userId={user.id}
                   />
                 )}
-                {Number(wallet.savings_balance) > 0 && (
+                {savingsBalance > 0 && (
                   <WithdrawWalletButton
                     source="savings"
-                    maxAmount={Number(wallet.savings_balance)}
+                    maxAmount={savingsBalance}
                     label="Retirer mon épargne"
                     userId={user.id}
                   />
                 )}
-                {Number(wallet.tontine_balance) > 0 && Number(wallet.savings_balance) > 0 && (
+                {Number(wallet.tontine_balance) > 0 && savingsBalance > 0 && (
                   <WithdrawWalletButton
                     source="all"
-                    maxAmount={Number(wallet.total_balance)}
-                    label={`Tout retirer (${formatFCFA(wallet.total_balance)})`}
+                    maxAmount={totalBalance}
+                    label={`Tout retirer (${formatFCFA(totalBalance)})`}
                     userId={user.id}
                     variant="primary"
                   />
@@ -154,4 +163,3 @@ export default async function PortefeuillePage() {
     </div>
   )
 }
-

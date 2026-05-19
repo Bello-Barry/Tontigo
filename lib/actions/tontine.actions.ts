@@ -15,7 +15,7 @@ export async function createGroup(data: any): Promise<ActionResult<{ id: string 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+  const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase()
 
   try {
     const { data: group, error } = await serviceClient
